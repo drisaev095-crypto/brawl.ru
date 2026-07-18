@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Brawl Stars HTML5 Ultimate</title>
+    <style>
+        body { margin: 0; background: #111; color: #fff; font-family: 'Arial Black', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+        #menu { position: absolute; background: rgba(20, 20, 40, 0.95); border: 4px solid #f39c12; padding: 25px; border-radius: 15px; text-align: center; z-index: 10; box-shadow: 0 0 30px rgba(0,0,0,0.8); max-height: 85vh; overflow-y: auto; width: 450px; }
+        .btn { background: #e67e22; color: white; border: none; padding: 10px 20px; margin: 5px; font-size: 16px; font-weight: bold; cursor: pointer; border-radius: 8px; transition: 0.2s; box-shadow: 0 4px #d35400; width: 85%; }
+        .btn:hover { background: #f39c12; } .btn:active { transform: translateY(4px); box-shadow: none; }
+        .btn:disabled { background: #7f8c8d; box-shadow: 0 4px #95a5a6; cursor: not-allowed; opacity: 0.6; }
+        .brawler-card { background: rgba(255,255,255,0.05); margin: 8px 0; padding: 8px; border-radius: 8px; border: 2px solid #555; display: flex; flex-direction: column; align-items: center; }
+        .unlocked { border-color: #2ecc71; }
+        .shop-container { display: flex; justify-content: space-around; margin-top: 15px; border-top: 2px solid #34495e; padding-top: 15px; }
+        .box-btn { background: #2980b9; box-shadow: 0 4px #1f3a60; font-size: 13px; padding: 8px 12px; width: 28%; margin: 0; }
+        .box-btn:hover { background: #3498db; }
+        #ui { display: flex; gap: 20px; margin-bottom: 10px; font-size: 18px; background: rgba(0,0,0,0.6); padding: 8px 20px; border-radius: 20px; border: 2px solid #34495e; align-items: center; }
+        .bar-container { width: 120px; height: 18px; background: #34495e; border-radius: 9px; display: inline-block; vertical-align: middle; overflow: hidden; border: 1px solid #000; }
+        #hp-bar { width: 100%; background: #2ecc71; height: 100%; transition: width 0.1s; }
+        #ult-bar { width: 0%; background: #f1c40f; height: 100%; transition: width 0.1s; }
+        canvas { border: 4px solid #f39c12; background: #27ae60; box-shadow: 0 0 20px rgba(0,0,0,0.6); cursor: crosshair; }
+        #log { font-size: 14px; color: #f1c40f; min-height: 20px; margin-top: 5px; font-family: sans-serif; }
+    </style>
+</head>
+<body>
+    <div id="menu">
+        <h2 style="color: #f1c40f; margin-top:0;">BRAWL BOX SHOP & MENU</h2>
+        <div style="font-size: 18px; margin-bottom: 10px;">Монеты: <span id="menu-coins" style="color:#f1c40f">0</span> 💰</div>
+        
+        <div class="shop-container">
+            <button class="btn box-btn" onclick="openBox('normal')">Ящик<br>100 💰</button>
+            <button class="btn box-btn" style="background:#8e44ad; box-shadow:0 4px #5e2d70" onclick="openBox('big')">Большой<br>250 💰</button>
+            <button class="btn box-btn" style="background:#e74c3c; box-shadow:0 4px #b03a2e" onclick="openBox('mega')">Мегаящик<br>500 💰</button>
+        </div>
+        <div id="log">Купите ящик или выберите бойца!</div>
+
+        <h3 style="margin: 15px 0 5px 0;">ВАШИ БРАВЛЕРЫ:</h3>
+        <div id="brawlers-list"></div>
+    </div>
+
+    <div id="ui">
+        <div>Счет: <span id="score">0</span></div>
+        <div>Монеты: <span id="game-coins">0</span> 💰</div>
+        <div>HP: <div class="bar-container"><div id="hp-bar"></div></div></div>
+        <div>УЛЬТА: <div class="bar-container"><div id="ult-bar"></div></div></div>
+    </div>
+    <canvas id="gameCanvas" width="900" height="550"></canvas>
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const menu = document.getElementById("menu");
+        const scoreEl = document.getElementById("score");
+        const gameCoinsEl = document.getElementById("game-coins");
+        const menuCoinsEl = document.getElementById("menu-coins");
+        const hpBar = document.getElementById("hp-bar");
+        const ultBar = document.getElementById("ult-bar");
+        const logEl = document.getElementById("log");
+        const brawlersListEl = document.getElementById("brawlers-list");
+
+        let coins = 300; 
+        let unlockedBrawlers = { shelly: { level: 1 } };
+
+        const CHARACTERS = {
+            shelly: { name: 'ШЕЛЛИ', color: '#9b59b6', speed: 4.5, maxHp: 120, bulletType: 'spread', ultType: 'super_spread', radius: 20, fireCooldown: 600, rarity: 'Начальный', dmg: 10 },
+            colt: { name: 'КОЛЬТ', color: '#e74c3c', speed: 5.5, maxHp: 90, bulletType: 'fast', ultType: 'laser_storm', radius: 17, fireCooldown: 500, rarity: 'Редкий', dmg: 8 },
+            el_primo: { name: 'ЭЛЬ ПРИМО', color: '#2980b9', speed: 4.0, maxHp: 220, bulletType: 'melee', ultType: 'mega_splash', radius: 24, fireCooldown: 400, rarity: 'Редкий', dmg: 16 },
+            brock: { name: 'БРОК', color: '#34495e', speed: 4.2, maxHp: 100, bulletType: 'rocket', ultType: 'rocket_rain', radius: 18, fireCooldown: 800, rarity: 'Сверхредкий', dmg: 25 },
+            rico: { name: 'РИКО', color: '#1abc9c', speed: 4.8, maxHp: 85, bulletType: 'bounce', ultType: 'bounce_storm', radius: 16, fireCooldown: 550, rarity: 'Сверхредкий', dmg: 7 },
+            poco: { name: 'ПОКО', color: '#f1c40f', speed: 4.6, maxHp: 130, bulletType: 'music', ultType: 'heal_wave', radius: 19, fireCooldown: 700, rarity: 'Эпический', dmg: 12 },
+            spike: { name: 'СПАЙК', color: '#2ecc71', speed: 4.1, maxHp: 75, bulletType: 'spike', ultType: 'cactus_field', radius: 15, fireCooldown: 750, rarity: 'Легендарный', dmg: 15 }
+        };
+
+        let player = {}, currentType = 'shelly';
+        let bullets = [], enemies = [], particles = [], score = 0, keys = {}, mouseX = 0, mouseY = 0, isPlaying = false;
+        let isMouseDown = false, lastFiredTime = 0;
+
+        function renderMenu() {
+            menuCoinsEl.innerText = coins;
+            brawlersListEl.innerHTML = '';
+            for (let key in CHARACTERS) {
+                const b = CHARACTERS[key];
+                const isUnlocked = unlockedBrawlers[key];
+                const card = document.createElement('div');
+                card.className = `brawler-card ${isUnlocked ? 'unlocked' : ''}`;
+                
+                let infoText = `${b.name} (${b.rarity}) - Макс. HP: ${b.maxHp}`;
+                if (isUnlocked) infoText += ` [Уровень ${unlockedBrawlers[key].level}]`;
+
+                card.innerHTML = `
+                    <div style="font-size:14px; margin-bottom:5px; font-weight:bold; color:${b.color}">${infoText}</div>
+                    <button class="btn" style="margin:2px; padding:6px; font-size:14px; background:${b.color}" 
+                        ${!isUnlocked ? 'disabled' : ''} onclick="selectCharacter('${key}')">
+                        ${isUnlocked ? 'В БОЙ' : 'ЗАБЛОКИРОВАНО'}
+                    </button>
+                `;
+                brawlersListEl.appendChild(card);
+            }
+        }
+
+        function openBox(boxType) {
+            let cost = 100; let rolls = 1;
+            if (boxType === 'big') { cost = 250; rolls = 3; }
+            if (boxType === 'mega') { cost = 500; rolls = 10; }
+
+            if (coins < cost) { logEl.innerText = "Недостаточно монет! Играйте, чтобы заработать."; return; }
+            coins -= cost; let rewards = [];
+
+            for (let r = 0; r < rolls; r++) {
+                let rand = Math.random(); let chosen = 'colt';
+                if (rand < 0.40) chosen = 'colt';
+                else if (rand < 0.65) chosen = 'el_primo';
+                else if (rand < 0.82) chosen = 'brock';
+                else if (rand < 0.93) chosen = 'rico';
+                else if (rand < 0.98) chosen = 'poco';
+                else chosen = 'spike';
+
+                if (unlockedBrawlers[chosen]) {
+                    unlockedBrawlers[chosen].level++;
+                    rewards.push(`${CHARACTERS[chosen].name} (Ур. повышена до ${unlockedBrawlers[chosen].level})`);
+                } else {
+                    unlockedBrawlers[chosen] = { level: 1 };
+                    rewards.push(`НОВЫЙ БРАВЛЕР: ${CHARACTERS[chosen].name}! 🎉`);
+                }
+            }
+            logEl.innerHTML = "Выпало:<br>" + rewards.join("<br>");
+            renderMenu();
+        }
+
+        window.addEventListener("keydown", (e) => { keys[e.code] = true; if (e.code === "Space") useUltimate(); });
+        window.addEventListener("keyup", (e) => keys[e.code] = false);
+        canvas.addEventListener("mousemove", (e) => { const rect = canvas.getBoundingClientRect(); mouseX = e.clientX - rect.left; mouseY = e.clientY - rect.top; });
+        canvas.addEventListener("mousedown", () => { isMouseDown = true; });
+        window.addEventListener("mouseup", () => { isMouseDown = false; });
+
+        function selectCharacter(type) {
+            currentType = type; const config = CHARACTERS[type];
+            const lvl = unlockedBrawlers[type].level;
+            const maxHp = Math.round(config.maxHp * (1 + (lvl - 1) * 0.1));
+            player = { 
+                x: 150, y: 275, radius: config.radius, color: config.color, speed: config.speed, 
+                hp: maxHp, maxHp: maxHp, ultCharge: 0, 
+                dmg: Math.round(config.dmg * (1 + (lvl - 1) * 0.1)) 
+            };
+            score = 0; bullets = []; enemies = []; particles = [];
+            scoreEl.innerText = score; gameCoinsEl.innerText = coins;
+            updateBars(); menu.style.display = "none"; isPlaying = true; lastFiredTime = 0;
+        }
+
+        function updateBars() {
+            hpBar.style.width = Math.max(0, (player.hp / player.maxHp) * 100) + "%";
+            ultBar.style.width = Math.min(100, player.ultCharge) + "%";
+            ultBar.style.background = player.ultCharge >= 100 ? "#e67e22" : "#f1c40f";
+        }
+        function createBullet(angle, speed, radius, range, color, specialType = 'normal', pDmg = player.dmg) { 
+            bullets.push({ 
+                x: player.x, y: player.y, dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed, 
+                radius: radius, color: color, startX: player.x, startY: player.y, range: range, 
+                type: specialType, bounces: specialType === 'bounce' ? 3 : 0, dmg: pDmg 
+            }); 
+        }
+
+        function fireWeapon() {
+            const now = Date.now();
+            if (now - lastFiredTime < CHARACTERS[currentType].fireCooldown) return;
+            lastFiredTime = now;
+            const angle = Math.atan2(mouseY - player.y, mouseX - player.x);
+            const type = CHARACTERS[currentType].bulletType;
+
+            if (type === 'spread') { for (let i = -2; i <= 2; i++) createBullet(angle + i * 0.15, 8, 6, 300, '#f1c40f'); }
+            else if (type === 'fast') { let delay = 0; for (let i = 0; i < 3; i++) { setTimeout(() => { if (isPlaying) createBullet(Math.atan2(mouseY - player.y, mouseX - player.x), 13, 5, 500, '#f39c12'); }, delay); delay += 90; } }
+            else if (type === 'melee') { createBullet(angle, 6, 26, 90, 'rgba(255,255,255,0.6)', 'melee'); }
+            else if (type === 'rocket') { createBullet(angle, 10, 10, 550, '#e74c3c', 'rocket'); }
+            else if (type === 'bounce') { createBullet(angle, 9, 6, 450, '#9b59b6', 'bounce'); }
+            else if (type === 'music') { createBullet(angle, 7, 30, 250, '#3498db', 'music'); }
+            else if (type === 'spike') { createBullet(angle, 8, 9, 380, '#2ecc71', 'spike'); }
+        }
+
+        function useUltimate() {
+            if (player.ultCharge < 100 || !isPlaying) return;
+            player.ultCharge = 0; updateBars();
+            const angle = Math.atan2(mouseY - player.y, mouseX - player.x), type = CHARACTERS[currentType].ultType;
+
+            if (type === 'super_spread') { for (let i = -5; i <= 5; i++) createBullet(angle + i * 0.12, 10, 8, 380, '#e67e22', 'normal', player.dmg * 1.2); }
+            else if (type === 'laser_storm') { let delay = 0; for (let i = 0; i < 12; i++) { setTimeout(() => { if (isPlaying) createBullet(Math.atan2(mouseY - player.y, mouseX - player.x), 16, 6, 600, '#e74c3c'); }, delay); delay += 50; } }
+            else if (type === 'mega_splash') { player.x = mouseX; player.y = mouseY; for (let a = 0; a < Math.PI * 2; a += 0.3) createBullet(a, 6, 15, 130, '#3498db', 'normal', player.dmg * 1.5); }
+            else if (type === 'rocket_rain') { for (let i = 0; i < 6; i++) { let a = angle + (Math.random() - 0.5) * 0.4; createBullet(a, 9, 12, 500, '#e67e22', 'rocket', player.dmg * 1.4); } }
+            else if (type === 'bounce_storm') { for (let i = 0; i < 15; i++) { createBullet(angle + (Math.random() - 0.5) * 0.3, 12, 7, 600, '#1abc9c', 'bounce'); } }
+            else if (type === 'heal_wave') { player.hp = Math.min(player.maxHp, player.hp + player.maxHp * 0.5); updateBars(); createBullet(angle, 5, 70, 300, '#2ecc71', 'music'); }
+            else if (type === 'cactus_field') { createBullet(angle, 7, 18, 400, '#27ae60', 'spike_bomb'); }
+        }
+
+        function createExplosion(x, y, radius, color) {
+            particles.push({ x: x, y: y, radius: radius, maxRadius: radius * 2.5, life: 1, maxLife: 15, color: color });
+            enemies.forEach(enemy => {
+                if (Math.hypot(enemy.x - x, enemy.y - y) < enemy.radius + radius * 2) enemy.hp -= 2;
+            });
+        }
+        function spawnEnemy() {
+            if (!isPlaying) return; const rand = Math.random();
+            let enemy = { x: canvas.width + 50, y: Math.random() * (canvas.height - 60) + 30, radius: 15, color: '#c0392b', speed: Math.random() * 1.5 + 1.5, hp: 1, type: 'normal' };
+            if (rand > 0.85) { enemy.color = '#f1c40f'; enemy.speed = 3.8; enemy.radius = 12; enemy.type = 'fast'; }
+            else if (rand > 0.65) { enemy.color = '#8e44ad'; enemy.speed = 0.9; enemy.radius = 28; enemy.hp = 5; enemy.type = 'boss'; }
+            if (enemies.length < 10) enemies.push(enemy);
+        }
+        setInterval(spawnEnemy, 1000);
+
+        function update() {
+            if (!isPlaying) return;
+            if (keys["KeyW"] && player.y - player.radius > 0) player.y -= player.speed;
+            if (keys["KeyS"] && player.y + player.radius < canvas.height) player.y += player.speed;
+            if (keys["KeyA"] && player.x - player.radius > 0) player.x -= player.speed;
+            if (keys["KeyD"] && player.x + player.radius < canvas.width) player.x += player.speed;
+
+            if (isMouseDown) fireWeapon();
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i]; p.life++; p.radius += (p.maxRadius - p.radius) * 0.1;
+                if (p.life > p.maxLife) particles.splice(i, 1);
+            }
+
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                let b = bullets[i]; b.x += b.dx; b.y += b.dy;
+                if (b.type === 'bounce') {
+                    if (b.y - b.radius < 0 || b.y + b.radius > canvas.height) { b.dy *= -1; b.bounces--; }
+                    if (b.x - b.radius < 0 || b.x + b.radius > canvas.width) { b.dx *= -1; b.bounces--; }
+                }
+                let outOfBounds = b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height;
+                let rangeExceeded = Math.hypot(b.x - b.startX, b.y - b.startY) > b.range;
+                if (rangeExceeded || (outOfBounds && b.bounces <= 0)) {
+                    if (b.type === 'rocket') createExplosion(b.x, b.y, 25, 'rgba(230, 126, 34, 0.7)');
+                    if (b.type === 'spike' || b.type === 'spike_bomb') {
+                        let count = b.type === 'spike_bomb' ? 16 : 6;
+                        for (let a = 0; a < Math.PI * 2; a += (Math.PI * 2) / count) {
+                            bullets.push({ x: b.x, y: b.y, dx: Math.cos(a) * 5, dy: Math.sin(a) * 5, radius: 4, color: '#2ecc71', startX: b.x, startY: b.y, range: 100, type: 'normal', dmg: Math.round(b.dmg * 0.5) });
+                        }
+                    }
+                    bullets.splice(i, 1);
+                }
+            }
+
+            for (let eIndex = enemies.length - 1; eIndex >= 0; eIndex--) {
+                let enemy = enemies[eIndex]; const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x); 
+                enemy.x += Math.cos(angle) * enemy.speed; enemy.y += Math.sin(angle) * enemy.speed;
+
+                if (Math.hypot(player.x - enemy.x, player.y - enemy.y) < player.radius + enemy.radius) { 
+                    player.hp -= enemy.type === 'boss' ? 40 : 15; updateBars(); enemies.splice(eIndex, 1); 
+                    if (player.hp <= 0) { 
+                        isPlaying = false; isMouseDown = false; alert("Матч окончен! Очки: " + score); 
+                        renderMenu(); menu.style.display = "block"; 
+                    } 
+                    continue;
+                }
+
+                for (let bIndex = bullets.length - 1; bIndex >= 0; bIndex--) {
+                    let bullet = bullets[bIndex];
+                    if (Math.hypot(bullet.x - enemy.x, bullet.y - enemy.y) < bullet.radius + enemy.radius) { 
+                        enemy.hp -= bullet.dmg;
+                        if (bullet.type === 'rocket') createExplosion(bullet.x, bullet.y, 30, 'rgba(231, 76, 60, 0.8)');
+                        if (bullet.type !== 'music' && bullet.type !== 'melee') bullets.splice(bIndex, 1); 
+                        if (player.ultCharge < 100) { player.ultCharge += 7; updateBars(); } 
+                        if (enemy.hp <= 0) { 
+                            enemies.splice(eIndex, 1); let gainedCoins = enemy.type === 'boss' ? 25 : 5;
+                            score += enemy.type === 'boss' ? 50 : 10; coins += gainedCoins;
+                            scoreEl.innerText = score; gameCoinsEl.innerText = coins; break;
+                        } 
+                    }
+                }
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); if (!isPlaying) return;
+            ctx.beginPath(); ctx.moveTo(player.x, player.y); ctx.lineTo(mouseX, mouseY); ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)'; ctx.lineWidth = 2; ctx.stroke();
+            ctx.beginPath(); ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2); ctx.fillStyle = player.color; ctx.shadowBlur = 12; ctx.shadowColor = player.color; ctx.fill(); ctx.shadowBlur = 0;
+            bullets.forEach(b => { ctx.beginPath(); ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2); ctx.fillStyle = b.color; ctx.fill(); });
+            particles.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fillStyle = p.color; ctx.fill(); });
+            enemies.forEach(enemy => { ctx.beginPath(); ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2); ctx.fillStyle = enemy.color; ctx.fill(); if (enemy.type === 'boss') { ctx.fillStyle = '#fff'; ctx.font = '11px Arial Black'; ctx.fillText("БОСС", enemy.x - 17, enemy.y - 33); } });
+        }
+
+        function loop() { update(); draw(); requestAnimationFrame(loop); }
+        renderMenu();
+        loop();
+    </script>
+</body>
+</html>
