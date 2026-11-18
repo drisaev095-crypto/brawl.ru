@@ -1082,7 +1082,9 @@ function updateBattle() {
       const dist = Math.hypot(e.x - a.x, e.y - a.y);
       if (dist < bestDist) { bestDist = dist; nearest = e; }
     }
+    if (!nearest && gameMode === 'heist' && heistSafe) nearest = heistSafe;
     if (!nearest) continue;
+
 
     const ang = Math.atan2(nearest.y - a.y, nearest.x - a.x);
     if (a.type === 'bear' && bestDist > 32) {
@@ -1112,6 +1114,29 @@ function updateBattle() {
           const pa = Math.atan2(z.y - e.y, z.x - e.x);
           e.x += Math.cos(pa) * 4.5;
           e.y += Math.sin(pa) * 4.5;
+        }
+      }
+    }
+        // Урон Сейфу и ящикам от ульт-взрывов и луж (Брок, Барли, Эль Примо, Спайк и др.)
+    if (z.dmg > 0) {
+      if (gameMode === 'heist' && heistSafe && Math.hypot(heistSafe.x - z.x, heistSafe.y - z.y) < z.r + heistSafe.radius) {
+        if ((z.instant && z.life === 14) || (!z.instant && z.life % 20 === 0)) {
+          heistSafe.hp -= z.dmg;
+          addFloatingText(heistSafe.x, heistSafe.y - 42, `-${z.dmg}`, '#f39c12');
+          updateBattleHUD();
+          if (heistSafe.hp <= 0) { kills += 8; endMatch(false); return; }
+        }
+      }
+      if (gameMode === 'showdown') {
+        for (let ci = crates.length - 1; ci >= 0; ci--) {
+          const c = crates[ci];
+          if (Math.hypot(c.x - z.x, c.y - z.y) < z.r + 22) {
+            if ((z.instant && z.life === 14) || (!z.instant && z.life % 20 === 0)) {
+              c.hp -= z.dmg;
+              addFloatingText(c.x, c.y - 22, `-${z.dmg}`, '#2ecc71');
+              if (c.hp <= 0) { pickups.push({ type: 'cube', x: c.x, y: c.y }); crates.splice(ci, 1); }
+            }
+          }
         }
       }
     }
