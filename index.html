@@ -709,7 +709,7 @@ function startMatch() {
     const spots = [{x:340,y:130},{x:340,y:410},{x:480,y:120},{x:480,y:420},{x:620,y:130},{x:620,y:410},{x:820,y:270}];
     for (const s of spots) crates.push({ x: s.x, y: s.y, hp: 2200, maxHp: 2200 });
   } else if (gameMode === 'heist') {
-    heistSafe = { x: 865, y: 270, radius: 38, hp: 25000, maxHp: 25000 };
+    heistSafe = { x: 865, y: 270, radius: 38, hp: 50000, maxHp: 50000 };
   }
 
   document.getElementById('hud-kills').innerText = '0';
@@ -1317,10 +1317,12 @@ function updateBattle() {
       if (gemHoldTimer % 60 === 0) updateBattleHUD();
       if (gemHoldTimer >= 900) { kills += 5; endMatch(false); return; }
     } else gemHoldTimer = 0;
-  } else if (gameMode === 'heist' && heistSafe) {
+  }   } else if (gameMode === 'heist' && heistSafe) {
     for (let bi = bullets.length - 1; bi >= 0; bi--) {
       const b = bullets[bi];
+      if (b.hitIds.has('safe')) continue;
       if (Math.hypot(b.x - heistSafe.x, b.y - heistSafe.y) < b.radius + heistSafe.radius) {
+        b.hitIds.add('safe');
         heistSafe.hp -= b.dmg;
         addFloatingText(heistSafe.x, heistSafe.y - 42, `-${b.dmg}`, '#f39c12');
         updateBattleHUD();
@@ -1329,7 +1331,6 @@ function updateBattle() {
       }
     }
   }
-
   // Подбор банок усиления и кристаллов
   for (let pi = pickups.length - 1; pi >= 0; pi--) {
     const p = pickups[pi];
