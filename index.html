@@ -1317,7 +1317,7 @@ function updateBattle() {
       if (gemHoldTimer % 60 === 0) updateBattleHUD();
       if (gemHoldTimer >= 900) { kills += 5; endMatch(false); return; }
     } else gemHoldTimer = 0;
-  }   } else if (gameMode === 'heist' && heistSafe) {
+  }    else if (gameMode === 'heist' && heistSafe) {
     for (let bi = bullets.length - 1; bi >= 0; bi--) {
       const b = bullets[bi];
       if (b.hitIds.has('safe')) continue;
@@ -1330,7 +1330,7 @@ function updateBattle() {
         if (heistSafe.hp <= 0) { kills += 8; endMatch(false); return; }
       }
     }
-  
+  }
   // Подбор банок усиления и кристаллов
   for (let pi = pickups.length - 1; pi >= 0; pi--) {
     const p = pickups[pi];
