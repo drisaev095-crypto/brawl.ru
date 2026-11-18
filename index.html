@@ -1904,6 +1904,175 @@ gameLoop();
   };
 })();
 </script>
+<!-- ДОПОЛНЕНИЕ: КЛУБ, МЕГАКОПИЛКА И ТАБЛИЦА ЛИДЕРОВ -->
+<script>
+(function() {
+  let clubData = {
+    clubName: 'BRAWL LEGENDS RU',
+    pigWins: 0,
+    chat: [
+      { author: 'Глава [Леон]', text: 'Всем привет! Набиваем кубки для Мегакопилки!' },
+      { author: 'Про_Мортис', text: 'Я уже 45/45 бойцов выбил 🔥' }
+    ]
+  };
+
+  try {
+    const saved = JSON.parse(localStorage.getItem('bs_club_v1'));
+    if (saved) clubData = Object.assign(clubData, saved);
+  } catch (e) {}
+
+  function saveClub() {
+    localStorage.setItem('bs_club_v1', JSON.stringify(clubData));
+  }
+
+  // Добавляем кнопку "🛡️ КЛУБ И ТОП" в верхнюю панель лобби
+  const nav = document.getElementById('extra-nav');
+  if (nav) {
+    const clubBtn = document.createElement('button');
+    clubBtn.className = 'extra-pill-btn';
+    clubBtn.style.background = '#2980b9';
+    clubBtn.innerHTML = '🛡️ КЛУБ И ТОП';
+    clubBtn.onclick = () => openClubModal('top');
+    nav.appendChild(clubBtn);
+  }
+
+  // Отслеживаем рост кубков для прогресса Мегакопилки клуба
+  let lastTrophies = typeof state !== 'undefined' ? state.trophies : 0;
+  setInterval(() => {
+    if (typeof state !== 'undefined' && state.trophies > lastTrophies) {
+      clubData.pigWins = Math.min(5, clubData.pigWins + 1);
+      saveClub();
+    }
+    if (typeof state !== 'undefined') lastTrophies = state.trophies;
+  }, 1000);
+
+  const BOTS_LEADERBOARD = [
+    { name: 'ZETA | Sitetampo', club: 'ZETA DIVISION', trophies: 65400 },
+    { name: 'Hyra 👑',          club: 'ONE TEAM',      trophies: 58200 },
+    { name: 'Eqwaak',           club: 'TRIBE GAMING',  trophies: 49800 },
+    { name: 'Holdik YT',        club: 'HOLDIK TEAM',   trophies: 38500 },
+    { name: 'Aurum TV',         club: 'AURUM STARS',   trophies: 29100 },
+    { name: 'Шелли_Про2026',    club: 'RUSSIA TOP',    trophies: 18400 },
+    { name: 'Shadow_Leon',      club: 'BRAWL LEGENDS', trophies: 11200 },
+    { name: 'Mortis_God',       club: 'TRICKSHOTS',    trophies: 6800 },
+    { name: 'Spike_Cactus',     club: 'DESERT TEAM',   trophies: 3900 },
+    { name: 'Colt_Sheriff',     club: 'WILD WEST',     trophies: 2500 },
+    { name: 'Poco_Loco',        club: 'MARIACHI',      trophies: 1650 },
+    { name: 'Nita_Bear',        club: 'JUNGLE',        trophies: 950 },
+    { name: 'Новичок_БС',       club: 'СТАРТ',         trophies: 400 }
+  ];
+
+  window.openClubModal = function(tab) {
+    playSound(500, 'triangle', 0.1);
+    document.getElementById('extra-modal').style.display = 'flex';
+    const titleEl = document.getElementById('extra-modal-title');
+    const subEl = document.getElementById('extra-modal-sub');
+    const track = document.getElementById('extra-track');
+
+    titleEl.innerHTML = `
+      <button class="mini-btn ${tab === 'top' ? 'btn-green' : 'btn-blue'}" style="padding:8px 14px; font-size:13px;" onclick="openClubModal('top')">📊 ТОП ЛИДЕРОВ</button>
+      <button class="mini-btn ${tab === 'club' ? 'btn-green' : 'btn-blue'}" style="padding:8px 14px; font-size:13px;" onclick="openClubModal('club')">🛡️ МОЙ КЛУБ</button>
+    `;
+
+    track.innerHTML = '';
+
+    if (tab === 'top') {
+      const myTrophies = state.trophies || 0;
+      const myBrawlers = Object.keys(state.unlocked || {}).length;
+      const allPlayers = [
+        ...BOTS_LEADERBOARD,
+        { name: 'ТЫ (ИГРОК) ⭐', club: clubData.clubName, trophies: myTrophies, isMe: true, brawlers: myBrawlers }
+      ].sort((a, b) => b.trophies - a.trophies);
+
+      const myRank = allPlayers.findIndex(p => p.isMe) + 1;
+      subEl.innerText = `Твоё место в мире: #${myRank} из ${allPlayers.length} | Кубки: ${myTrophies} 🏆`;
+
+      allPlayers.forEach((p, idx) => {
+        const row = document.createElement('div');
+        row.className = `tier-row ${p.isMe ? 'ready' : ''}`;
+        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
+        row.innerHTML = `
+          <div style="display:flex; align-items:center; gap:14px;">
+            <div style="font-size:20px; width:40px; text-align:center; color:#f1c40f;">${medal}</div>
+            <div>
+              <div style="font-size:15px; color:${p.isMe ? '#2ecc71' : '#fff'}">${p.name}</div>
+              <div style="font-size:11px; color:#aaa;">🛡️ ${p.club} ${p.brawlers ? '• Бойцов: ' + p.brawlers + '/45' : ''}</div>
+            </div>
+          </div>
+          <div style="font-size:16px; color:#f1c40f;">${p.trophies.toLocaleString('ru-RU')} 🏆</div>
+        `;
+        track.appendChild(row);
+      });
+    } else {
+      subEl.innerHTML = `
+        Клуб: <b style="color:#f1c40f">${clubData.clubName}</b> &nbsp;
+        <button class="mini-btn btn-purple" style="max-width:130px; padding:4px 8px;" onclick="renameClub()">СМЕНИТЬ КЛУБ</button>
+      `;
+
+      // Мегакопилка клуба
+      const pigReady = clubData.pigWins >= 5;
+      const pigBox = document.createElement('div');
+      pigBox.className = `tier-row ${pigReady ? 'ready' : ''}`;
+      pigBox.innerHTML = `
+        <div>
+          <div style="font-size:16px; color:#f1c40f;">🐷 МЕГАКОПИЛКА КЛУБА (${clubData.pigWins}/5 побед)</div>
+          <div style="font-size:12px; color:#ccc;">Побеждай в матчах, чтобы заполнить копилку и забрать 500 💰 + 25 💎!</div>
+        </div>
+        <button class="mini-btn ${pigReady ? 'btn-green' : 'btn-blue'}" style="max-width:130px; padding:10px;" ${pigReady ? '' : 'disabled'} onclick="claimClubPig()">
+          ${pigReady ? 'РАЗБИТЬ! 🔨' : 'КОПИТСЯ...'}
+        </button>
+      `;
+      track.appendChild(pigBox);
+
+      // Клубный чат
+      const chatBox = document.createElement('div');
+      chatBox.style.cssText = 'background:#162436; border:2px solid #000; border-radius:12px; padding:12px; margin-top:8px;';
+      chatBox.innerHTML = `
+        <div style="font-size:13px; color:#f1c40f; margin-bottom:8px;">💬 ЧАТ КЛУБА:</div>
+        <div style="display:flex; flex-direction:column; gap:6px; max-height:160px; overflow-y:auto; margin-bottom:10px;">
+          ${clubData.chat.map(m => `<div style="font-size:12px;"><b style="color:#3498db">${m.author}:</b> ${m.text}</div>`).join('')}
+        </div>
+        <div style="display:flex; gap:8px;">
+          <input id="club-msg-input" type="text" placeholder="Написать в клуб..." style="flex:1; padding:8px; border-radius:8px; border:2px solid #000; font-family:sans-serif;">
+          <button class="mini-btn btn-green" style="max-width:110px;" onclick="sendClubMsg()">ОТПРАВИТЬ</button>
+        </div>
+      `;
+      track.appendChild(chatBox);
+    }
+  };
+
+  window.renameClub = function() {
+    const name = prompt('Введи название своего клуба:', clubData.clubName);
+    if (name && name.trim()) {
+      clubData.clubName = name.trim().toUpperCase();
+      saveClub();
+      openClubModal('club');
+    }
+  };
+
+  window.claimClubPig = function() {
+    if (clubData.pigWins < 5) return;
+    clubData.pigWins = 0;
+    state.coins += 500;
+    state.gems += 25;
+    saveClub();
+    saveState();
+    updateTopBar();
+    playSound(850, 'square', 0.3, 0.15);
+    alert('🐷 МЕГАКОПИЛКА РАЗБИТА!\nНаграда клуба: +500 💰 и +25 💎!');
+    openClubModal('club');
+  };
+
+  window.sendClubMsg = function() {
+    const inp = document.getElementById('club-msg-input');
+    if (!inp || !inp.value.trim()) return;
+    clubData.chat.push({ author: 'Ты [Президент]', text: inp.value.trim() });
+    if (clubData.chat.length > 15) clubData.chat.shift();
+    saveClub();
+    openClubModal('club');
+  };
+})();
+</script>
 
 </body>
 </html>
