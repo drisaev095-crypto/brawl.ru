@@ -1562,5 +1562,206 @@ loadState();
 updateLobbyUI();
 gameLoop();
 </script>
+ <!-- ДОПОЛНЕНИЕ: БРАВЛ ПАСС И ПУТЬ СЛАВЫ -->
+<style>
+  #extra-nav {
+    position: fixed;
+    top: 72px;
+    left: 20px;
+    display: flex;
+    gap: 10px;
+    z-index: 15;
+  }
+  .extra-pill-btn {
+    border: 3px solid #000;
+    border-radius: 12px;
+    padding: 8px 14px;
+    font-family: 'Arial Black', sans-serif;
+    font-size: 13px;
+    color: #fff;
+    text-shadow: 1px 1px 0 #000;
+    cursor: pointer;
+    box-shadow: 0 4px 0 #000;
+  }
+  .extra-pill-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #000; }
+  #extra-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.88);
+    z-index: 90;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    padding: 25px;
+    overflow-y: auto;
+  }
+  .extra-panel {
+    width: 100%;
+    max-width: 760px;
+    background: #1b2a3c;
+    border: 4px solid #000;
+    border-radius: 18px;
+    padding: 20px;
+  }
+  .reward-track {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 15px;
+    max-height: 65vh;
+    overflow-y: auto;
+    padding-right: 5px;
+  }
+  .tier-row {
+    background: #273c56;
+    border: 3px solid #000;
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .tier-row.ready { border-color: #f1c40f; background: #2e4a6b; }
+  .tier-row.claimed { opacity: 0.55; }
+</style>
+
+<div id="extra-nav">
+  <button class="extra-pill-btn" style="background:#e67e22;" onclick="openExtraModal('pass')">🎫 БРАВЛ ПАСС (<span id="bp-tokens-ui">0</span> ⚡)</button>
+  <button class="extra-pill-btn" style="background:#f1c40f; color:#111; text-shadow:none;" onclick="openExtraModal('road')">🏆 ПУТЬ СЛАВЫ</button>
+</div>
+
+<div id="extra-modal">
+  <div class="extra-panel">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h2 id="extra-modal-title" style="color:#f1c40f; text-shadow:2px 2px 0 #000;">БРАВЛ ПАСС</h2>
+      <button class="bs-btn btn-red" style="padding:8px 18px; font-size:14px;" onclick="closeExtraModal()">ЗАКРЫТЬ ✖</button>
+    </div>
+    <div id="extra-modal-sub" style="font-size:13px; color:#ccc; margin-top:6px;"></div>
+    <div id="extra-track" class="reward-track"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  let extraData = {
+    tokens: 0,
+    claimedPass: [],
+    claimedRoad: []
+  };
+
+  try {
+    const saved = JSON.parse(localStorage.getItem('bs_extra_v1'));
+    if (saved) extraData = Object.assign(extraData, saved);
+  } catch (e) {}
+
+  function saveExtra() {
+    localStorage.setItem('bs_extra_v1', JSON.stringify(extraData));
+    document.getElementById('bp-tokens-ui').innerText = extraData.tokens;
+  }
+
+  // Начисление жетонов Бравл Пасса за каждое убийство в бою
+  let lastTrackedKills = 0;
+  setInterval(() => {
+    const nav = document.getElementById('extra-nav');
+    if (nav) nav.style.display = document.getElementById('lobby-screen').classList.contains('active') ? 'flex' : 'none';
+
+    if (typeof isPlaying !== 'undefined' && isPlaying) {
+      if (kills > lastTrackedKills) {
+        extraData.tokens += (kills - lastTrackedKills) * 15;
+        lastTrackedKills = kills;
+        saveExtra();
+      }
+    } else {
+      lastTrackedKills = 0;
+    }
+  }, 300);
+
+  const PASS_TIERS = [
+    { req: 50,   icon: '💰', label: '250 Монет',        give: () => { state.coins += 250; } },
+    { req: 120,  icon: '📦', label: 'Бесплатный Ящик',  give: () => { state.coins += 100; openBox('small'); } },
+    { req: 200,  icon: '💎', label: '15 Гемов',         give: () => { state.gems += 15; } },
+    { req: 300,  icon: '🗳️', label: 'Большой Ящик',     give: () => { state.coins += 250; openBox('big'); } },
+    { req: 420,  icon: '💰', label: '600 Монет',        give: () => { state.coins += 600; } },
+    { req: 550,  icon: '💎', label: '30 Гемов',         give: () => { state.gems += 30; } },
+    { req: 700,  icon: '🧰', label: 'МЕГАЯЩИК!',        give: () => { state.gems += 40; openBox('mega'); } },
+    { req: 900,  icon: '💰', label: '1200 Монет',       give: () => { state.coins += 1200; } },
+    { req: 1150, icon: '💎', label: '50 Гемов',         give: () => { state.gems += 50; } },
+    { req: 1500, icon: '🧰', label: 'МЕГАЯЩИК x2!',     give: () => { state.gems += 40; openBox('mega'); } }
+  ];
+
+  const ROAD_TIERS = [
+    { req: 50,   icon: '💰', label: '200 Монет',        give: () => { state.coins += 200; } },
+    { req: 150,  icon: '🗳️', label: 'Большой Ящик',     give: () => { state.coins += 250; openBox('big'); } },
+    { req: 300,  icon: '💎', label: '20 Гемов',         give: () => { state.gems += 20; } },
+    { req: 500,  icon: '💰', label: '500 Монет',        give: () => { state.coins += 500; } },
+    { req: 800,  icon: '🧰', label: 'МЕГАЯЩИК!',        give: () => { state.gems += 40; openBox('mega'); } },
+    { req: 1200, icon: '💎', label: '35 Гемов',         give: () => { state.gems += 35; } },
+    { req: 1600, icon: '💰', label: '1000 Монет',       give: () => { state.coins += 1000; } },
+    { req: 2000, icon: '🧰', label: 'МЕГАЯЩИК МАСТЕРА!',give: () => { state.gems += 40; openBox('mega'); } },
+    { req: 3000, icon: '💎', label: '80 Гемов',         give: () => { state.gems += 80; } },
+    { req: 5000, icon: '👑', label: '2500 Монет + 100 💎', give: () => { state.coins += 2500; state.gems += 100; } }
+  ];
+
+  window.openExtraModal = function(tab) {
+    playSound(500, 'triangle', 0.1);
+    document.getElementById('extra-modal').style.display = 'flex';
+    const track = document.getElementById('extra-track');
+    track.innerHTML = '';
+
+    const isPass = tab === 'pass';
+    document.getElementById('extra-modal-title').innerText = isPass ? '🎫 БРАВЛ ПАСС' : '🏆 ПУТЬ СЛАВЫ';
+    document.getElementById('extra-modal-sub').innerText = isPass
+      ? `Твои жетоны: ${extraData.tokens} ⚡ (+15 жетонов за каждого убитого врага в бою!)`
+      : `Твои кубки: ${state.trophies} 🏆 (Побеждай в матчах, чтобы открывать награды!)`;
+
+    const list = isPass ? PASS_TIERS : ROAD_TIERS;
+    const claimedArr = isPass ? extraData.claimedPass : extraData.claimedRoad;
+    const currentVal = isPass ? extraData.tokens : state.trophies;
+
+    list.forEach((t, idx) => {
+      const isClaimed = claimedArr.includes(idx);
+      const isReady = !isClaimed && currentVal >= t.req;
+      const row = document.createElement('div');
+      row.className = `tier-row ${isReady ? 'ready' : ''} ${isClaimed ? 'claimed' : ''}`;
+      row.innerHTML = `
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="font-size:28px;">${t.icon}</div>
+          <div>
+            <div style="font-size:15px;">${t.label}</div>
+            <div style="font-size:12px; color:#f1c40f;">Нужно: ${t.req} ${isPass ? '⚡' : '🏆'}</div>
+          </div>
+        </div>
+        <button class="mini-btn ${isReady ? 'btn-green' : 'btn-blue'}" style="max-width:120px; padding:10px;" ${isReady ? '' : 'disabled'} onclick="claimExtraReward('${tab}', ${idx})">
+          ${isClaimed ? 'ЗАБРАНО ✔' : isReady ? 'ЗАБРАТЬ!' : 'ЗАКРЫТО'}
+        </button>
+      `;
+      track.appendChild(row);
+    });
+  };
+
+  window.claimExtraReward = function(tab, idx) {
+    const isPass = tab === 'pass';
+    const list = isPass ? PASS_TIERS : ROAD_TIERS;
+    const claimedArr = isPass ? extraData.claimedPass : extraData.claimedRoad;
+    const currentVal = isPass ? extraData.tokens : state.trophies;
+
+    if (claimedArr.includes(idx) || currentVal < list[idx].req) return;
+    claimedArr.push(idx);
+    saveExtra();
+    playSound(800, 'square', 0.25, 0.12);
+    list[idx].give();
+    saveState();
+    updateTopBar();
+    openExtraModal(tab);
+  };
+
+  window.closeExtraModal = function() {
+    document.getElementById('extra-modal').style.display = 'none';
+  };
+
+  saveExtra();
+})();
+</script>
+
 </body>
 </html>
