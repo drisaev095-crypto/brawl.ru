@@ -1762,6 +1762,45 @@ gameLoop();
   saveExtra();
 })();
 </script>
+<!-- ДОПОЛНЕНИЕ: +20 НОВЫХ БРАВЛЕРОВ (ИТОГО 45!) -->
+<script>
+(function() {
+  const NEW_BRAWLERS = {
+    rosa:     { name: 'РОЗА',      icon: '🥊', rarity: 'rare',      hp: 5400, speed: 4.6, reload: 1000, dmg: 460,  atk: 'melee',     ult: 'super_speed',  desc: 'Тройной удар перчатками и щит скорости' },
+    dynamike: { name: 'ДИНАМАЙК',  icon: '🧨', rarity: 'superrare', hp: 2800, speed: 4.5, reload: 1450, dmg: 800,  atk: 'bottle',    ult: 'vial_splash',  desc: 'Две шашки динамита и мега-бочка' },
+    tick:     { name: 'ТИК',       icon: '💣', rarity: 'superrare', hp: 2200, speed: 4.4, reload: 1700, dmg: 640,  atk: 'bottle',    ult: 'rocket_rain',  desc: 'Мины по площади и самонаводящаяся голова' },
+    carl:     { name: 'КАРЛ',      icon: '⛏️', rarity: 'superrare', hp: 4400, speed: 4.6, reload: 1100, dmg: 740,  atk: 'bounce',    ult: 'super_spread', desc: 'Кирка-бумеранг с рикошетом' },
+    eightbit: { name: '8-БИТ',     icon: '🕹️', rarity: 'superrare', hp: 4800, speed: 3.6, reload: 1300, dmg: 360,  atk: 'burst6',    ult: 'heal_station', desc: 'Лазерный пулемет и усилитель урона' },
+    emz:      { name: 'ЭМЗ',       icon: '🧴', rarity: 'epic',      hp: 3600, speed: 4.4, reload: 1450, dmg: 520,  atk: 'music',     ult: 'thorn_field',  desc: 'Облако лака для волос и замедляющая аура' },
+    bea:      { name: 'БЕА',       icon: '🐝', rarity: 'epic',      hp: 2500, speed: 4.4, reload: 1050, dmg: 1250, atk: 'sniper',    ult: 'super_spread', desc: 'Жало пчелы и рой замедляющих дронов' },
+    nani:     { name: 'НАНИ',      icon: '🤖', rarity: 'epic',      hp: 2600, speed: 4.4, reload: 1500, dmg: 850,  atk: 'cards',     ult: 'elbow_drop',   desc: 'Три энерго-сферы и взрывной дрон Пип' },
+    edgar:    { name: 'ЭДГАР',     icon: '🧣', rarity: 'epic',      hp: 3300, speed: 5.4, reload: 750,  dmg: 540,  atk: 'melee',     ult: 'elbow_drop',   desc: 'Молниеносный шарф и прыжок на врага' },
+    griff:    { name: 'ГРИФФ',     icon: '💵', rarity: 'epic',      hp: 3400, speed: 4.4, reload: 1350, dmg: 310,  atk: 'scrap_fan', ult: 'super_spread', desc: 'Веер монет и возвращающиеся банкноты' },
+    sprout:   { name: 'СПРАУТ',    icon: '🌱', rarity: 'mythic',    hp: 3000, speed: 4.4, reload: 1400, dmg: 940,  atk: 'cactus',    ult: 'thorn_field',  desc: 'Прыгающие семена и заросли живой изгороди' },
+    lou:      { name: 'ЛУ',        icon: '🍧', rarity: 'mythic',    hp: 3200, speed: 4.5, reload: 1200, dmg: 440,  atk: 'shurikens', ult: 'thorn_field',  desc: 'Ледяные рожки и скользкий каток' },
+    buzz:     { name: 'БАЗЗ',      icon: '🕶️', rarity: 'mythic',    hp: 4400, speed: 5.0, reload: 1050, dmg: 420,  atk: 'heavy_sg',  ult: 'bulldoze',     desc: 'Ультразвук и гарпун-рывок со станом' },
+    fang:     { name: 'ФЭНГ',      icon: '👟', rarity: 'mythic',    hp: 4300, speed: 5.1, reload: 1150, dmg: 1200, atk: 'sniper',    ult: 'bulldoze',     desc: 'Мощный удар ногой и летающий кроссовок' },
+    gray:     { name: 'ГРЕЙ',      icon: '🎩', rarity: 'mythic',    hp: 3300, speed: 4.6, reload: 1350, dmg: 1160, atk: 'sniper',    ult: 'elbow_drop',   desc: 'Невидимая пуля и мгновенный портал' },
+    amber:    { name: 'АМБЕР',     icon: '🔥', rarity: 'legendary', hp: 3300, speed: 4.7, reload: 650,  dmg: 280,  atk: 'energy_4',  ult: 'bottle_rain',  desc: 'Непрерывный поток огня и лужи масла' },
+    meg:      { name: 'МЭГ',       icon: '🦾', rarity: 'legendary', hp: 4600, speed: 4.5, reload: 1200, dmg: 360,  atk: 'burst6',    ult: 'hammer',       desc: 'Двойные бластеры мехи и удар клинком' },
+    surge:    { name: 'ВОЛЬТ',     icon: '🥤', rarity: 'legendary', hp: 3100, speed: 4.7, reload: 1400, dmg: 1180, atk: 'coin_bag',  ult: 'swoop',        desc: 'Энерго-заряд, делящийся при попадании, и прыжок' },
+    chester:  { name: 'ЧЕСТЕР',    icon: '🃏', rarity: 'legendary', hp: 3500, speed: 4.8, reload: 1300, dmg: 640,  atk: 'spread',    ult: 'stun_smash',   desc: 'Каскад колокольчиков и взрывная конфета' },
+    kit:      { name: 'КИТ',       icon: '🐱', rarity: 'legendary', hp: 3200, speed: 5.3, reload: 900,  dmg: 800,  atk: 'dash',      ult: 'swoop',        desc: 'Кошачьи когти и акробатический прыжок' }
+  };
+
+  Object.assign(BRAWLERS, NEW_BRAWLERS);
+
+  // Обновляем надписи в интерфейсе с 25 на 45
+  const btnBrawlers = document.querySelector("button[onclick=\"switchScreen('brawlers-screen')\"]");
+  if (btnBrawlers) {
+    btnBrawlers.innerHTML = '👊 БОЙЦЫ (<span id="unlocked-count">' + Object.keys(state.unlocked).length + '</span>/45)';
+  }
+  const headerH2 = document.querySelector('#brawlers-screen h2');
+  if (headerH2) headerH2.innerText = 'ВСЕ БОЙЦЫ (45)';
+
+  if (typeof updateTopBar === 'function') updateTopBar();
+})();
+</script>
 
 </body>
 </html>
