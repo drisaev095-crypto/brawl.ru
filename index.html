@@ -213,7 +213,10 @@
       <div id="lobby-stats" class="lobby-stats"></div>
     </div>
 
-    <button class="bs-btn btn-play" onclick="startMatch()">ИГРАТЬ!</button>
+        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:10px; align-self:flex-end; margin-bottom:10px;">
+      <button id="mode-btn" class="bs-btn btn-purple" style="font-size:15px; padding:10px 20px;" onclick="cycleGameMode()">💀 РЕЖИМ: СТОЛКНОВЕНИЕ</button>
+      <button class="bs-btn btn-play" style="margin-bottom:0;" onclick="startMatch()">ИГРАТЬ!</button>
+    </div>
   </div>
 
   <div id="brawlers-screen" class="screen">
@@ -264,6 +267,8 @@
       <div>HP: <div class="hud-bar"><div id="hp-fill"></div></div></div>
       <div>СУПЕР (Пробел): <div class="hud-bar"><div id="ult-fill"></div></div></div>
       <div>Патроны: <b id="hud-ammo">⚡⚡⚡</b></div>
+      <div>Гаджет (E): <b id="hud-gadget" style="color:#2ecc71">🟢🟢🟢</b></div>
+      <div id="hud-mode-info" style="color:#f1c40f">🧪 Банки: 0</div>
       <button class="mini-btn btn-red" style="padding:6px 12px;" onclick="endMatch(false)">ВЫЙТИ</button>
     </div>
     <canvas id="gameCanvas" width="960" height="540"></canvas>
@@ -614,7 +619,21 @@ let player = null;
 let bullets = [], enemies = [], allies = [], zones = [], particles = [];
 let walls = [], bushes = [];
 let kills = 0, spawnTimer = 0;
+let gameMode = 'showdown'; // 'showdown' | 'gemgrab' | 'heist'
+let crates = [], pickups = [], heistSafe = null, floatingTexts = [];
+let playerGems = 0, gemHoldTimer = 0, gemSpawnTimer = 0;
 
+function cycleGameMode() {
+  const modes = [
+    { id: 'showdown', text: '💀 РЕЖИМ: СТОЛКНОВЕНИЕ' },
+    { id: 'gemgrab',  text: '💎 РЕЖИМ: ЗАХВАТ КРИСТАЛЛОВ' },
+    { id: 'heist',    text: '🧰 РЕЖИМ: ОГРАБЛЕНИЕ (СЕЙФ)' }
+  ];
+  const nextIdx = (modes.findIndex(m => m.id === gameMode) + 1) % modes.length;
+  gameMode = modes[nextIdx].id;
+  document.getElementById('mode-btn').innerText = modes[nextIdx].text;
+  playSound(500, 'triangle', 0.1);
+}
 // Защита от залипания клавиш (больше никогда не потянет вниз!)
 function resetInputs() {
   keys = {};
@@ -624,6 +643,7 @@ window.addEventListener('blur', resetInputs);
 document.addEventListener('visibilitychange', resetInputs);
 window.addEventListener('keydown', e => {
   keys[e.code] = true;
+  if (e.code === 'KeyE' && isPlaying) useGadget();
   if (e.code === 'Space' && isPlaying) {
     e.preventDefault();
     useUltimate();
@@ -662,9 +682,9 @@ function startMatch() {
   const b = BRAWLERS[key];
   const stats = getBrawlerStats(key);
 
-  player = {
+    player = {
     key: key,
-    x: 130, y: 270, radius: 19,
+    x: 110, y: 270, radius: 19,
     color: RARITY_INFO[b.rarity].color,
     icon: b.icon,
     speed: stats.speed,
@@ -672,20 +692,31 @@ function startMatch() {
     dmg: stats.dmg,
     ammo: 3, maxAmmo: 3,
     reloadTime: b.reload,
-    reloadProgress: 0,
     fireDelay: 250, lastShot: 0,
     ultCharge: 0,
+    gadgets: 3, shieldTimer: 0, powerCubes: 0,
     invisTimer: 0, speedBoostTimer: 0
   };
 
   bullets = []; enemies = []; allies = []; zones = []; particles = [];
+  crates = []; pickups = []; heistSafe = null; floatingTexts = [];
   kills = 0; spawnTimer = 0;
+  playerGems = 0; gemHoldTimer = 0; gemSpawnTimer = 0;
+
+  if (gameMode === 'showdown') {
+    const spots = [{x:340,y:130},{x:340,y:410},{x:480,y:120},{x:480,y:420},{x:620,y:130},{x:620,y:410},{x:820,y:270}];
+    for (const s of spots) crates.push({ x: s.x, y: s.y, hp: 2200, maxHp: 2200 });
+  } else if (gameMode === 'heist') {
+    heistSafe = { x: 865, y: 270, radius: 38, hp: 25000, maxHp: 25000 };
+  }
+
   document.getElementById('hud-kills').innerText = '0';
   updateBattleHUD();
 
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('game-screen').classList.add('active');
   isPlaying = true;
+
 }
 
 function endMatch(died) {
@@ -710,7 +741,42 @@ function updateBattleHUD() {
   document.getElementById('ult-fill').style.background = player.ultCharge >= 100 ? '#e67e22' : '#f1c40f';
   const full = Math.floor(player.ammo);
   document.getElementById('hud-ammo').innerText = '⚡'.repeat(full) + '▫️'.repeat(3 - full);
+  document.getElementById('hud-gadget').innerText = '🟢'.repeat(player.gadgets) + '⚫'.repeat(3 - player.gadgets);
+
+  const modeEl = document.getElementById('hud-mode-info');
+  if (gameMode === 'showdown') modeEl.innerText = `🧪 Банки: ${player.powerCubes}`;
+  else if (gameMode === 'gemgrab') modeEl.innerText = `💎 Кристаллы: ${playerGems}/10` + (playerGems >= 10 ? ` (${Math.ceil((900 - gemHoldTimer)/60)}с)` : '');
+  else if (gameMode === 'heist' && heistSafe) modeEl.innerText = `🧰 Сейф: ${Math.max(0, heistSafe.hp)} HP`;
 }
+
+function addFloatingText(x, y, text, color = '#fff') {
+  floatingTexts.push({ x, y, text, color, life: 42 });
+}
+
+function useGadget() {
+  if (!player || player.gadgets <= 0) return;
+  player.gadgets--;
+  playSound(720, 'triangle', 0.2, 0.12);
+  const ang = Math.atan2(mouseY - player.y, mouseX - player.x);
+  const r = BRAWLERS[player.key].rarity;
+
+  if (r === 'common' || r === 'rare') {
+    player.x = Math.max(25, Math.min(canvas.width - 25, player.x + Math.cos(ang) * 110));
+    player.y = Math.max(25, Math.min(canvas.height - 25, player.y + Math.sin(ang) * 110));
+    player.ammo = Math.min(3, player.ammo + 1);
+    addFloatingText(player.x, player.y - 25, 'РЫВОК!', '#2ecc71');
+  } else if (r === 'superrare' || r === 'epic') {
+    player.hp = Math.min(player.maxHp, player.hp + 1200);
+    player.ammo = 3;
+    addFloatingText(player.x, player.y - 25, '+1200 HP!', '#2ecc71');
+  } else {
+    player.shieldTimer = 240;
+    player.speedBoostTimer = 180;
+    addFloatingText(player.x, player.y - 25, 'ЩИТ + СКОРОСТЬ!', '#f1c40f');
+  }
+  updateBattleHUD();
+}
+
 function spawnBullet(x, y, ang, spd, rad, range, color, dmg, opts = {}) {
   bullets.push({
     x, y, sx: x, sy: y,
@@ -1129,13 +1195,27 @@ function updateBattle() {
 
 
     // Касание игрока врагом
-    if (Math.hypot(player.x - e.x, player.y - e.y) < player.radius + e.radius) {
-      player.hp -= e.type === 'boss' ? 850 : 420;
+      if (Math.hypot(player.x - e.x, player.y - e.y) < player.radius + e.radius) {
+      let rawDmg = e.type === 'boss' ? 850 : 420;
+      if (player.shieldTimer > 0) rawDmg = Math.round(rawDmg * 0.3);
+      player.hp -= rawDmg;
+      addFloatingText(player.x, player.y - 20, `-${rawDmg}`, '#e74c3c');
       updateBattleHUD();
       enemies.splice(ei, 1);
-      if (player.hp <= 0) { endMatch(true); return; }
+      if (player.hp <= 0) {
+        if (gameMode === 'gemgrab' && playerGems > 0) {
+          for (let g = 0; g < playerGems; g++) pickups.push({ type: 'gem', x: player.x + (Math.random()-0.5)*50, y: player.y + (Math.random()-0.5)*50 });
+          playerGems = 0; gemHoldTimer = 0; player.hp = player.maxHp;
+          player.x = 110; player.y = 270;
+          addFloatingText(player.x, player.y - 30, 'ВОЗРОЖДЕНИЕ!', '#f1c40f');
+          updateBattleHUD();
+          continue;
+        }
+        endMatch(true); return;
+      }
       continue;
     }
+
 
     // Проверка попадания пуль
     for (let bi = bullets.length - 1; bi >= 0; bi--) {
@@ -1146,7 +1226,7 @@ function updateBattle() {
         let finalDmg = b.dmg;
         if (b.sniper) finalDmg = Math.round(b.dmg * (0.4 + 0.8 * (Math.hypot(b.x - b.sx, b.y - b.sy) / b.range)));
         e.hp -= finalDmg;
-
+        addFloatingText(e.x, e.y - 18, `-${finalDmg}`, b.sniper ? '#f1c40f' : '#fff');
         if (b.poison) { e.poisonTicks = 80; e.poisonDmg = b.poison; }
         if (b.stun) e.stun = b.stun;
         if (b.knockback) {
@@ -1178,7 +1258,78 @@ function updateBattle() {
       enemies.splice(ei, 1);
     }
   }
+
+  if (player.shieldTimer > 0) player.shieldTimer--;
+
+  // Логика режимов: Ящики с банками, Шахта кристаллов и Сейф
+  if (gameMode === 'showdown') {
+    for (let ci = crates.length - 1; ci >= 0; ci--) {
+      const c = crates[ci];
+      for (let bi = bullets.length - 1; bi >= 0; bi--) {
+        const b = bullets[bi];
+        if (Math.hypot(b.x - c.x, b.y - c.y) < b.radius + 22) {
+          c.hp -= b.dmg;
+          addFloatingText(c.x, c.y - 22, `-${b.dmg}`, '#2ecc71');
+          if (!b.pierce) bullets.splice(bi, 1);
+          if (c.hp <= 0) {
+            pickups.push({ type: 'cube', x: c.x, y: c.y });
+            crates.splice(ci, 1);
+            break;
+          }
+        }
+      }
+    }
+  } else if (gameMode === 'gemgrab') {
+    gemSpawnTimer++;
+    if (gemSpawnTimer >= 240) {
+      gemSpawnTimer = 0;
+      pickups.push({ type: 'gem', x: 480 + (Math.random() - 0.5) * 60, y: 270 + (Math.random() - 0.5) * 60 });
+    }
+    if (playerGems >= 10) {
+      gemHoldTimer++;
+      if (gemHoldTimer % 60 === 0) updateBattleHUD();
+      if (gemHoldTimer >= 900) { kills += 5; endMatch(false); return; }
+    } else gemHoldTimer = 0;
+  } else if (gameMode === 'heist' && heistSafe) {
+    for (let bi = bullets.length - 1; bi >= 0; bi--) {
+      const b = bullets[bi];
+      if (Math.hypot(b.x - heistSafe.x, b.y - heistSafe.y) < b.radius + heistSafe.radius) {
+        heistSafe.hp -= b.dmg;
+        addFloatingText(heistSafe.x, heistSafe.y - 42, `-${b.dmg}`, '#f39c12');
+        updateBattleHUD();
+        if (!b.pierce) bullets.splice(bi, 1);
+        if (heistSafe.hp <= 0) { kills += 8; endMatch(false); return; }
+      }
+    }
+  }
+
+  // Подбор банок усиления и кристаллов
+  for (let pi = pickups.length - 1; pi >= 0; pi--) {
+    const p = pickups[pi];
+    if (Math.hypot(player.x - p.x, player.y - p.y) < player.radius + 16) {
+      if (p.type === 'cube') {
+        player.powerCubes++;
+        player.maxHp += 400; player.hp += 400;
+        player.dmg = Math.round(player.dmg * 1.1);
+        addFloatingText(player.x, player.y - 25, '+1 БАНКА! (+400 HP)', '#2ecc71');
+      } else if (p.type === 'gem') {
+        playerGems++;
+        addFloatingText(player.x, player.y - 25, '+1 КРИСТАЛЛ 💎', '#e056fd');
+      }
+      playSound(800, 'sine', 0.15, 0.1);
+      updateBattleHUD();
+      pickups.splice(pi, 1);
+    }
+  }
+
+  // Обновление всплывающих цифр урона
+  for (let fi = floatingTexts.length - 1; fi >= 0; fi--) {
+    floatingTexts[fi].y -= 0.7;
+    floatingTexts[fi].life--;
+    if (floatingTexts[fi].life <= 0) floatingTexts.splice(fi, 1);
+  }
 }
+
 function drawBattle() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (!isPlaying) return;
@@ -1200,7 +1351,87 @@ function drawBattle() {
     ctx.strokeRect(b.x, b.y, b.w, b.h);
   }
 
+  // Ящики с банками (Столкновение)
+  for (const c of crates) {
+    ctx.fillStyle = '#27ae60';
+    ctx.fillRect(c.x - 20, c.y - 20, 40, 40);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(c.x - 20, c.y - 20, 40, 40);
+    ctx.fillStyle = '#f1c40f';
+    ctx.font = '18px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('⚡', c.x, c.y);
+    ctx.fillStyle = '#111';
+    ctx.fillRect(c.x - 20, c.y - 28, 40, 5);
+    ctx.fillStyle = '#2ecc71';
+    ctx.fillRect(c.x - 20, c.y - 28, 40 * (c.hp / c.maxHp), 5);
+  }
+
+  // Шахта кристаллов (Захват кристаллов)
+  if (gameMode === 'gemgrab') {
+    ctx.beginPath();
+    ctx.arc(480, 270, 26, 0, Math.PI * 2);
+    ctx.fillStyle = '#8e44ad';
+    ctx.fill();
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.font = '20px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('💎', 480, 270);
+  }
+
+  // Сейф (Ограбление)
+  if (gameMode === 'heist' && heistSafe) {
+    ctx.beginPath();
+    ctx.arc(heistSafe.x, heistSafe.y, heistSafe.radius, 0, Math.PI * 2);
+    ctx.fillStyle = '#c0392b';
+    ctx.fill();
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.font = '32px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🧰', heistSafe.x, heistSafe.y);
+    ctx.fillStyle = '#111';
+    ctx.fillRect(heistSafe.x - 45, heistSafe.y - 52, 90, 8);
+    ctx.fillStyle = '#e74c3c';
+    ctx.fillRect(heistSafe.x - 45, heistSafe.y - 52, 90 * Math.max(0, heistSafe.hp / heistSafe.maxHp), 8);
+  }
+
+  // Банки усиления и кристаллы на земле
+  for (const p of pickups) {
+    ctx.font = '20px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(p.type === 'cube' ? '🧪' : '💎', p.x, p.y);
+  }
+
+  // Щит от Гаджета вокруг игрока
+  if (player.shieldTimer > 0) {
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.radius + 7, 0, Math.PI * 2);
+    ctx.strokeStyle = '#f1c40f';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+
+  // Всплывающие цифры урона
+  for (const f of floatingTexts) {
+    ctx.font = 'bold 15px Arial Black';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#000';
+    ctx.fillText(f.text, f.x + 1, f.y + 1);
+    ctx.fillStyle = f.color;
+    ctx.fillText(f.text, f.x, f.y);
+  }
+
   // Стены
+
   for (const w of walls) {
     ctx.fillStyle = '#7f8c8d';
     ctx.fillRect(w.x, w.y, w.w, w.h);
