@@ -1801,6 +1801,109 @@ gameLoop();
   if (typeof updateTopBar === 'function') updateTopBar();
 })();
 </script>
+<!-- ДОПОЛНЕНИЕ: ПУТЬ СЛАВЫ ДО 100 000 КУБКОВ (ШАГ 300 🏆) -->
+<script>
+(function() {
+  const megaRoad = [];
+  for (let t = 300; t <= 100000; t += 300) {
+    const step = t / 300;
+    if (t % 3000 === 0) {
+      // Каждые 3 000 кубков — МЕГАЯЩИК!
+      megaRoad.push({
+        req: t,
+        icon: '🧰',
+        label: `МЕГАЯЩИК (${t.toLocaleString('ru-RU')} 🏆)`,
+        give: () => { state.gems += 40; openBox('mega'); }
+      });
+    } else if (step % 3 === 0) {
+      // Каждые 900 кубков — Большой Ящик
+      megaRoad.push({
+        req: t,
+        icon: '🗳️',
+        label: 'Большой Ящик',
+        give: () => { state.coins += 250; openBox('big'); }
+      });
+    } else if (step % 2 === 0) {
+      // Каждые 600 кубков — Гемы (от 25 до 75 💎)
+      const gems = 25 + Math.min(50, Math.floor(t / 2000) * 5);
+      megaRoad.push({
+        req: t,
+        icon: '💎',
+        label: `${gems} Гемов`,
+        give: () => { state.gems += gems; }
+      });
+    } else {
+      // Остальные шаги каждые 300 кубков — Монеты (от 350 до 2500 💰)
+      const coins = 350 + Math.min(2150, Math.floor(t / 1500) * 100);
+      megaRoad.push({
+        req: t,
+        icon: '💰',
+        label: `${coins} Монет`,
+        give: () => { state.coins += coins; }
+      });
+    }
+  }
+
+  // Финальная награда ровно на 100 000 кубков!
+  megaRoad.push({
+    req: 100000,
+    icon: '👑',
+    label: 'ЛЕГЕНДА 100 000 🏆: 10 000 💰 + 500 💎 + МЕГАЯЩИК!',
+    give: () => { state.coins += 10000; state.gems += 540; openBox('mega'); }
+  });
+
+  // Подменяем окно Пути славы на новую ленту до 100 000 🏆
+  const origOpen = window.openExtraModal;
+  window.openExtraModal = function(tab) {
+    if (tab !== 'road') return origOpen(tab);
+    playSound(500, 'triangle', 0.1);
+    document.getElementById('extra-modal').style.display = 'flex';
+    const track = document.getElementById('extra-track');
+    track.innerHTML = '';
+
+    document.getElementById('extra-modal-title').innerText = '🏆 ПУТЬ СЛАВЫ (ДО 100 000 🏆)';
+    document.getElementById('extra-modal-sub').innerText = `Твои кубки: ${state.trophies} 🏆 | Награда каждые 300 кубков!`;
+
+    const saved = JSON.parse(localStorage.getItem('bs_extra_v1') || '{"tokens":0,"claimedPass":[],"claimedRoad":[]}');
+    const claimedArr = saved.claimedRoad || [];
+
+    megaRoad.forEach((t, idx) => {
+      const key = 'r_' + t.req;
+      const isClaimed = claimedArr.includes(key);
+      const isReady = !isClaimed && state.trophies >= t.req;
+      const row = document.createElement('div');
+      row.className = `tier-row ${isReady ? 'ready' : ''} ${isClaimed ? 'claimed' : ''}`;
+      row.innerHTML = `
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="font-size:28px;">${t.icon}</div>
+          <div>
+            <div style="font-size:15px;">${t.label}</div>
+            <div style="font-size:12px; color:#f1c40f;">Нужно: ${t.req.toLocaleString('ru-RU')} 🏆</div>
+          </div>
+        </div>
+        <button class="mini-btn ${isReady ? 'btn-green' : 'btn-blue'}" style="max-width:120px; padding:10px;" ${isReady ? '' : 'disabled'} onclick="claimMegaRoad(${idx})">
+          ${isClaimed ? 'ЗАБРАНО ✔' : isReady ? 'ЗАБРАТЬ!' : 'ЗАКРЫТО'}
+        </button>
+      `;
+      track.appendChild(row);
+    });
+  };
+
+  window.claimMegaRoad = function(idx) {
+    const item = megaRoad[idx];
+    const saved = JSON.parse(localStorage.getItem('bs_extra_v1') || '{"tokens":0,"claimedPass":[],"claimedRoad":[]}');
+    const key = 'r_' + item.req;
+    if (saved.claimedRoad.includes(key) || state.trophies < item.req) return;
+    saved.claimedRoad.push(key);
+    localStorage.setItem('bs_extra_v1', JSON.stringify(saved));
+    playSound(800, 'square', 0.25, 0.12);
+    item.give();
+    saveState();
+    updateTopBar();
+    window.openExtraModal('road');
+  };
+})();
+</script>
 
 </body>
 </html>
