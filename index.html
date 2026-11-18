@@ -1081,6 +1081,16 @@ function updateBattle() {
   }
   // Враги: ИИ, яд, попадания пуль и столкновения с игроком
   const hidden = isPlayerHidden();
+   for (let ei = enemies.length - 1; ei >= 0; ei--) {
+    const e = enemies[ei];
+
+    // Урон от яда (Ворон / Байрон)
+    if (e.poisonTicks > 0) {
+      e.poisonTicks--;
+      if (e.poisonTicks % 20 === 0) e.hp -= e.poisonDmg;
+    }
+
+
       if (e.stun > 0) {
       e.stun--;
     } else {
