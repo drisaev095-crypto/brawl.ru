@@ -2187,6 +2187,234 @@ function saveMegaRoadClaims(claims) {
   profileBox.appendChild(nickname);
   profileBox.appendChild(changeButton);
 })();
+ <style>
+  #mobile-controls {
+    display: none;
+  }
+
+  @media (pointer: coarse), (max-width: 800px) {
+    #mobile-controls {
+      display: block;
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      pointer-events: none;
+      touch-action: none;
+      user-select: none;
+    }
+
+    #mobile-stick {
+      position: absolute;
+      left: 22px;
+      bottom: 24px;
+      width: 130px;
+      height: 130px;
+      border: 3px solid rgba(255,255,255,.6);
+      border-radius: 50%;
+      background: rgba(0,0,0,.35);
+      pointer-events: auto;
+      touch-action: none;
+    }
+
+    #mobile-stick-dot {
+      position: absolute;
+      left: 40px;
+      top: 40px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.75);
+      border: 3px solid #111;
+      pointer-events: none;
+    }
+
+    #mobile-action-buttons {
+      position: absolute;
+      right: 18px;
+      bottom: 22px;
+      display: grid;
+      grid-template-columns: 76px 76px;
+      gap: 10px;
+      pointer-events: auto;
+    }
+
+    .mobile-action {
+      width: 76px;
+      height: 76px;
+      border: 3px solid #111;
+      border-radius: 50%;
+      color: #fff;
+      font-weight: 900;
+      font-size: 12px;
+      text-shadow: 1px 1px #000;
+      box-shadow: 0 4px 0 #000;
+      touch-action: none;
+      user-select: none;
+    }
+
+    .mobile-action:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #000;
+    }
+
+    #mobile-attack { background: #e74c3c; }
+    #mobile-super  { background: #f1c40f; color: #111; text-shadow: none; }
+    #mobile-gadget { background: #2ecc71; color: #111; text-shadow: none; }
+  }
+</style>
+
+<div id="mobile-controls">
+  <div id="mobile-stick">
+    <div id="mobile-stick-dot"></div>
+  </div>
+
+  <div id="mobile-action-buttons">
+    <button id="mobile-attack" class="mobile-action" type="button">АТАКА</button>
+    <button id="mobile-super" class="mobile-action" type="button">СУПЕР</button>
+    <button id="mobile-gadget" class="mobile-action" type="button">ГАДЖЕТ</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  const stick = document.getElementById('mobile-stick');
+  const dot = document.getElementById('mobile-stick-dot');
+  const attackButton = document.getElementById('mobile-attack');
+  const superButton = document.getElementById('mobile-super');
+  const gadgetButton = document.getElementById('mobile-gadget');
+
+  if (!stick || !dot || !attackButton || !superButton || !gadgetButton) return;
+
+  let stickPointerId = null;
+  let mobileAutoFire = false;
+
+  function clearMovement() {
+    keys['KeyW'] = false;
+    keys['KeyA'] = false;
+    keys['KeyS'] = false;
+    keys['KeyD'] = false;
+    dot.style.transform = 'translate(0, 0)';
+  }
+
+  function updateStick(event) {
+    const rect = stick.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    let dx = event.clientX - centerX;
+    let dy = event.clientY - centerY;
+
+    const maxDistance = rect.width * 0.34;
+    const distance = Math.hypot(dx, dy);
+
+    if (distance > maxDistance) {
+      dx = dx / distance * maxDistance;
+      dy = dy / distance * maxDistance;
+    }
+
+    dot.style.transform = `translate(${dx}px, ${dy}px)`;
+
+    const deadZone = 12;
+    keys['KeyA'] = dx < -deadZone;
+    keys['KeyD'] = dx > deadZone;
+    keys['KeyW'] = dy < -deadZone;
+    keys['KeyS'] = dy > deadZone;
+  }
+
+  stick.addEventListener('pointerdown', function (event) {
+    if (!isPlaying) return;
+
+    event.preventDefault();
+    stickPointerId = event.pointerId;
+    stick.setPointerCapture(stickPointerId);
+    updateStick(event);
+  });
+
+  stick.addEventListener('pointermove', function (event) {
+    if (event.pointerId !== stickPointerId) return;
+    event.preventDefault();
+    updateStick(event);
+  });
+
+  function releaseStick(event) {
+    if (event.pointerId !== stickPointerId) return;
+    stickPointerId = null;
+    clearMovement();
+  }
+
+  stick.addEventListener('pointerup', releaseStick);
+  stick.addEventListener('pointercancel', releaseStick);
+
+  function aimAtNearestTarget() {
+    if (!player || !canvas) return;
+
+    let target = null;
+    let nearestDistance = Infinity;
+
+    for (const enemy of enemies) {
+      const distance = Math.hypot(enemy.x - player.x, enemy.y - player.y);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        target = enemy;
+      }
+    }
+
+    if (!target && gameMode === 'heist' && heistSafe) {
+      target = heistSafe;
+    }
+
+    // Если врагов рядом нет, направляем атаку вправо.
+    const aimX = target ? target.x : player.x + 100;
+    const aimY = target ? target.y : player.y;
+
+    const rect = canvas.getBoundingClientRect();
+    mouseX = (aimX / canvas.width) * rect.width;
+    mouseY = (aimY / canvas.height) * rect.height;
+  }
+
+  function fireLoop() {
+    if (mobileAutoFire && isPlaying) {
+      aimAtNearestTarget();
+    }
+    requestAnimationFrame(fireLoop);
+  }
+
+  attackButton.addEventListener('pointerdown', function (event) {
+    if (!isPlaying) return;
+    event.preventDefault();
+    mobileAutoFire = true;
+    isMouseDown = true;
+    aimAtNearestTarget();
+  });
+
+  function stopAttack(event) {
+    event.preventDefault();
+    mobileAutoFire = false;
+    isMouseDown = false;
+  }
+
+  attackButton.addEventListener('pointerup', stopAttack);
+  attackButton.addEventListener('pointercancel', stopAttack);
+  attackButton.addEventListener('lostpointercapture', stopAttack);
+
+  superButton.addEventListener('pointerdown', function (event) {
+    event.preventDefault();
+    if (isPlaying) useUltimate();
+  });
+
+  gadgetButton.addEventListener('pointerdown', function (event) {
+    event.preventDefault();
+    if (isPlaying) useGadget();
+  });
+
+  window.addEventListener('blur', function () {
+    mobileAutoFire = false;
+    isMouseDown = false;
+    clearMovement();
+  });
+
+  fireLoop();
+})();
+</script>
 </script>
 </body>
 </html>
