@@ -2028,7 +2028,7 @@ function saveMegaRoadClaims(claims) {
       const myBrawlers = Object.keys(state.unlocked || {}).length;
       const allPlayers = [
         ...BOTS_LEADERBOARD,
-        { name: 'ТЫ (ИГРОК) ⭐', club: clubData.clubName, trophies: myTrophies, isMe: true, brawlers: myBrawlers }
+        { name: (state.nickname || 'Игрок') + ' ⭐', club: clubData.clubName, trophies: myTrophies, isMe: true, brawlers: myBrawlers }
       ].sort((a, b) => b.trophies - a.trophies);
 
       const myRank = allPlayers.findIndex(p => p.isMe) + 1;
