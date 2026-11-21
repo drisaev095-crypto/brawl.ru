@@ -1805,6 +1805,42 @@ gameLoop();
 <script>
 (function() {
   const megaRoad = [];
+  function getMegaRoadClaims() {
+  let claims = [];
+  let oldClaims = [];
+
+  try {
+    claims = JSON.parse(
+      localStorage.getItem('bs_mega_road_claimed_v1') || '[]'
+    );
+  } catch (e) {
+    claims = [];
+  }
+
+  // Подхватываем отметки о наградах из старого сохранения.
+  try {
+    const oldData = JSON.parse(
+      localStorage.getItem('bs_extra_v1') || '{}'
+    );
+
+    if (Array.isArray(oldData.claimedRoad)) {
+      oldClaims = oldData.claimedRoad.filter(
+        key => typeof key === 'string' && key.startsWith('r_')
+      );
+    }
+  } catch (e) {
+    oldClaims = [];
+  }
+
+  return [...new Set([...claims, ...oldClaims])];
+}
+
+function saveMegaRoadClaims(claims) {
+  localStorage.setItem(
+    'bs_mega_road_claimed_v1',
+    JSON.stringify([...new Set(claims)])
+  );
+}
   for (let t = 300; t <= 100000; t += 300) {
     const step = t / 300;
     if (t % 3000 === 0) {
@@ -1864,8 +1900,7 @@ gameLoop();
     document.getElementById('extra-modal-title').innerText = '🏆 ПУТЬ СЛАВЫ (ДО 100 000 🏆)';
     document.getElementById('extra-modal-sub').innerText = `Твои кубки: ${state.trophies} 🏆 | Награда каждые 300 кубков!`;
 
-    const saved = JSON.parse(localStorage.getItem('bs_extra_v1') || '{"tokens":0,"claimedPass":[],"claimedRoad":[]}');
-    const claimedArr = saved.claimedRoad || [];
+    const claimedArr = getMegaRoadClaims();
 
     megaRoad.forEach((t, idx) => {
       const key = 'r_' + t.req;
@@ -1890,18 +1925,30 @@ gameLoop();
   };
 
   window.claimMegaRoad = function(idx) {
-    const item = megaRoad[idx];
-    const saved = JSON.parse(localStorage.getItem('bs_extra_v1') || '{"tokens":0,"claimedPass":[],"claimedRoad":[]}');
-    const key = 'r_' + item.req;
-    if (saved.claimedRoad.includes(key) || state.trophies < item.req) return;
-    saved.claimedRoad.push(key);
-    localStorage.setItem('bs_extra_v1', JSON.stringify(saved));
-    playSound(800, 'square', 0.25, 0.12);
-    item.give();
-    saveState();
-    updateTopBar();
+  const item = megaRoad[idx];
+  if (!item) return;
+
+  const key = 'r_' + item.req;
+  const claimedArr = getMegaRoadClaims();
+
+  if (claimedArr.includes(key)) {
+    alert('Эта награда уже получена.');
     window.openExtraModal('road');
-  };
+    return;
+  }
+
+  if (state.trophies < item.req) return;
+
+  // Сохраняем отметку до выдачи награды, чтобы нельзя было забрать её повторно.
+  claimedArr.push(key);
+  saveMegaRoadClaims(claimedArr);
+
+  playSound(800, 'square', 0.25, 0.12);
+  item.give();
+  saveState();
+  updateTopBar();
+  window.openExtraModal('road');
+};
 })();
 </script>
 <!-- ДОПОЛНЕНИЕ: КЛУБ, МЕГАКОПИЛКА И ТАБЛИЦА ЛИДЕРОВ -->
@@ -2073,6 +2120,73 @@ gameLoop();
   };
 })();
 </script>
+<script>
+(function () {
+  // Загружаем сохранённый ник или задаём начальный.
+  if (!state.nickname) {
+    state.nickname = 'Игрок';
+    saveState();
+  }
 
+  const profileBox = document.querySelector('.profile-box');
+  if (!profileBox) return;
+
+  const nickname = document.createElement('span');
+  nickname.id = 'player-nickname';
+  nickname.style.cssText =
+    'color:#fff; font-size:14px; text-shadow:1px 1px 0 #000; margin-left:8px;';
+  nickname.textContent = '👤 ' + state.nickname;
+
+  const changeButton = document.createElement('button');
+  changeButton.type = 'button';
+  changeButton.textContent = '✏️ СМЕНИТЬ НИК (60 💎)';
+  changeButton.style.cssText =
+    'margin-left:8px; padding:6px 9px; border:2px solid #000; border-radius:8px;' +
+    'background:#8e44ad; color:#fff; font-weight:bold; cursor:pointer;';
+
+  changeButton.addEventListener('click', function () {
+    const newNickname = prompt(
+      'Введи новый никнейм. Смена стоит 60 гемов:',
+      state.nickname
+    );
+
+    if (newNickname === null) return;
+
+    const cleanedNickname = newNickname.trim();
+
+    if (!cleanedNickname) {
+      alert('Никнейм не должен быть пустым.');
+      return;
+    }
+
+    if (cleanedNickname.length > 16) {
+      alert('Максимальная длина никнейма — 16 символов.');
+      return;
+    }
+
+    if (cleanedNickname === state.nickname) {
+      alert('Это уже твой текущий никнейм.');
+      return;
+    }
+
+    if (state.gems < 60) {
+      alert('Для смены никнейма нужно 60 гемов.');
+      return;
+    }
+
+    state.gems -= 60;
+    state.nickname = cleanedNickname;
+
+    saveState();
+    updateTopBar();
+
+    nickname.textContent = '👤 ' + state.nickname;
+    alert('Никнейм изменён!');
+  });
+
+  profileBox.appendChild(nickname);
+  profileBox.appendChild(changeButton);
+})();
+</script>
 </body>
 </html>
