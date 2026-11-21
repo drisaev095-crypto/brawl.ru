@@ -2656,5 +2656,294 @@ function saveMegaRoadClaims(claims) {
   };
 })();
 </script>
+ <script>
+(function () {
+  function nearestEnemy() {
+    if (!player || !enemies.length) return null;
+
+    return enemies.reduce((best, enemy) => {
+      const d = Math.hypot(enemy.x - player.x, enemy.y - player.y);
+      return !best || d < best.distance
+        ? { enemy, distance: d }
+        : best;
+    }, null)?.enemy || null;
+  }
+
+  function dash(distance) {
+    const angle = Math.atan2(mouseY - player.y, mouseX - player.x);
+    player.x = Math.max(25, Math.min(canvas.width - 25,
+      player.x + Math.cos(angle) * distance));
+    player.y = Math.max(25, Math.min(canvas.height - 25,
+      player.y + Math.sin(angle) * distance));
+  }
+
+  function area(x, y, radius, damage, color, extra = {}) {
+    zones.push({
+      x, y, r: radius, dmg: damage, color, life: 15, instant: true,
+      ...extra
+    });
+  }
+
+  function shoot(angle, damage, color, options = {}) {
+    spawnBullet(
+      player.x, player.y, angle, 12, 12, 420,
+      color, damage, options
+    );
+  }
+
+  function heal(amount) {
+    player.hp = Math.min(player.maxHp, player.hp + amount);
+  }
+
+  // У каждого бойца своя функция гаджета.
+  const gadgets = {
+    shelly() {
+      area(mouseX, mouseY, 75, player.dmg, '#f1c40f', { slow: true });
+    },
+    colt() {
+      player.ammo = Math.min(player.maxAmmo, player.ammo + 2);
+      shoot(Math.atan2(mouseY - player.y, mouseX - player.x),
+        Math.round(player.dmg * 1.4), '#3498db', { pierce: true });
+    },
+    el_primo() {
+      dash(135);
+      heal(450);
+      area(player.x, player.y, 65, Math.round(player.dmg * 1.2), '#e67e22');
+    },
+    nita() {
+      allies.push({
+        type: 'bear', x: player.x + 25, y: player.y,
+        hp: 1300, maxHp: 1300, dmg: Math.round(player.dmg * .45),
+        speed: 3.5, cd: 0, life: 300
+      });
+    },
+    bull() {
+      dash(170);
+      player.shieldTimer = 100;
+    },
+    barley() {
+      area(mouseX, mouseY, 85, Math.round(player.dmg * .55),
+        'rgba(46,204,113,.5)', { slow: true });
+    },
+    brock() {
+      area(mouseX, mouseY, 70, Math.round(player.dmg * 1.5),
+        'rgba(231,76,60,.6)');
+    },
+    rico() {
+      for (let i = -1; i <= 1; i++) {
+        shoot(Math.atan2(mouseY - player.y, mouseX - player.x) + i * .2,
+          player.dmg, '#3498db', { bounces: 3 });
+      }
+    },
+    jessie() {
+      allies.push({
+        type: 'turret', x: player.x, y: player.y,
+        hp: 1200, maxHp: 1200, dmg: Math.round(player.dmg * .35),
+        speed: 0, cd: 0, life: 320
+      });
+    },
+    darryl() {
+      dash(125);
+      player.shieldTimer = 130;
+      player.ammo = Math.min(player.maxAmmo, player.ammo + 1);
+    },
+    penny() {
+      area(mouseX, mouseY, 80, Math.round(player.dmg * 1.25),
+        'rgba(241,196,15,.6)');
+    },
+    poco() {
+      heal(Math.round(player.maxHp * .28));
+      area(player.x, player.y, 95, 0, 'rgba(46,204,113,.4)');
+    },
+    piper() {
+      dash(-115);
+      area(player.x, player.y, 60, Math.round(player.dmg * .8),
+        'rgba(231,76,60,.5)');
+    },
+    pam() {
+      heal(650);
+      zones.push({
+        x: player.x, y: player.y, r: 105, dmg: 0,
+        color: 'rgba(46,204,113,.35)', life: 180, healZone: true
+      });
+    },
+    frank() {
+      area(mouseX, mouseY, 90, Math.round(player.dmg * .7),
+        'rgba(241,196,15,.55)', { slow: true });
+    },
+    bibi() {
+      const target = nearestEnemy();
+      if (target) {
+        const a = Math.atan2(target.y - player.y, target.x - player.x);
+        shoot(a, Math.round(player.dmg * 1.2), '#f39c12',
+          { pierce: true, knockback: 45 });
+      }
+    },
+    mortis() {
+      dash(155);
+      heal(350);
+    },
+    tara() {
+      area(mouseX, mouseY, 90, Math.round(player.dmg * .65),
+        'rgba(142,68,173,.55)', { pullCenter: true });
+    },
+    gene() {
+      const target = nearestEnemy();
+      if (target) {
+        const a = Math.atan2(target.y - player.y, target.x - player.x);
+        shoot(a, Math.round(player.dmg * .6), '#e056fd', { pull: true });
+      }
+    },
+    max() {
+      player.speedBoostTimer = 240;
+      player.ammo = Math.min(player.maxAmmo, player.ammo + 1);
+    },
+    byron() {
+      heal(550);
+      const target = nearestEnemy();
+      if (target) {
+        const a = Math.atan2(target.y - player.y, target.x - player.x);
+        shoot(a, Math.round(player.dmg * .45), '#2ecc71',
+          { poison: Math.round(player.dmg * .25) });
+      }
+    },
+    spike() {
+      for (let i = 0; i < 8; i++) {
+        const a = i * Math.PI / 4;
+        shoot(a, Math.round(player.dmg * .6), '#2ecc71');
+      }
+    },
+    leon() {
+      player.invisTimer = 180;
+      player.speedBoostTimer = 100;
+    },
+    crow() {
+      for (let i = 0; i < 8; i++) {
+        const a = i * Math.PI / 4;
+        shoot(a, Math.round(player.dmg * .45), '#2ecc71',
+          { poison: Math.round(player.dmg * .2) });
+      }
+    },
+    sandy() {
+      zones.push({
+        x: player.x, y: player.y, r: 115, dmg: 0,
+        color: 'rgba(243,156,18,.3)', life: 180, invisZone: true
+      });
+    },
+
+    rosa() {
+      player.shieldTimer = 220;
+      heal(350);
+    },
+    dynamike() {
+      area(mouseX, mouseY, 80, Math.round(player.dmg * 1.5),
+        'rgba(230,126,34,.6)');
+    },
+    tick() {
+      for (let i = 0; i < 6; i++) {
+        const a = i * Math.PI / 3;
+        area(player.x + Math.cos(a) * 65, player.y + Math.sin(a) * 65,
+          35, Math.round(player.dmg * .55), 'rgba(52,73,94,.5)');
+      }
+    },
+    carl() {
+      dash(110);
+      shoot(Math.atan2(mouseY - player.y, mouseX - player.x),
+        Math.round(player.dmg * 1.2), '#95a5a6', { bounces: 2 });
+    },
+    eightbit() {
+      player.speedBoostTimer = 180;
+      player.shieldTimer = 90;
+    },
+    emz() {
+      area(mouseX, mouseY, 100, Math.round(player.dmg * .7),
+        'rgba(155,89,182,.5)', { slow: true });
+    },
+    bea() {
+      const a = Math.atan2(mouseY - player.y, mouseX - player.x);
+      shoot(a, Math.round(player.dmg * 1.8), '#f1c40f', { sniper: true });
+    },
+    nani() {
+      area(mouseX, mouseY, 70, Math.round(player.dmg * 1.4),
+        'rgba(52,152,219,.6)');
+    },
+    edgar() {
+      dash(100);
+      heal(500);
+      player.speedBoostTimer = 140;
+    },
+    griff() {
+      const a = Math.atan2(mouseY - player.y, mouseX - player.x);
+      for (let i = -2; i <= 2; i++) {
+        shoot(a + i * .18, Math.round(player.dmg * .7), '#f39c12');
+      }
+    },
+    sprout() {
+      area(mouseX, mouseY, 105, Math.round(player.dmg * .4),
+        'rgba(46,204,113,.45)', { slow: true });
+    },
+    lou() {
+      area(mouseX, mouseY, 85, Math.round(player.dmg * .4),
+        'rgba(93,173,226,.5)', { slow: true });
+    },
+    buzz() {
+      dash(140);
+      area(player.x, player.y, 80, Math.round(player.dmg * .9),
+        'rgba(22,160,133,.55)', { slow: true });
+    },
+    fang() {
+      dash(90);
+      const a = Math.atan2(mouseY - player.y, mouseX - player.x);
+      shoot(a, Math.round(player.dmg * 1.3), '#e67e22',
+        { pierce: true, knockback: 25 });
+    },
+    gray() {
+      dash(150);
+      player.shieldTimer = 100;
+    },
+    amber() {
+      area(mouseX, mouseY, 95, Math.round(player.dmg * .6),
+        'rgba(231,76,60,.45)', { slow: true });
+      player.speedBoostTimer = 100;
+    },
+    meg() {
+      player.shieldTimer = 150;
+      heal(450);
+      area(player.x, player.y, 70, Math.round(player.dmg * .7),
+        'rgba(52,152,219,.5)');
+    },
+    surge() {
+      player.speedBoostTimer = 160;
+      shoot(Math.atan2(mouseY - player.y, mouseX - player.x),
+        Math.round(player.dmg * 1.2), '#00d2d3', { split: 'fan3' });
+    },
+    chester() {
+      const a = Math.atan2(mouseY - player.y, mouseX - player.x);
+      for (let i = -2; i <= 2; i++) {
+        shoot(a + i * .16, Math.round(player.dmg * .65), '#f1c40f',
+          { stun: 18 });
+      }
+    },
+    kit() {
+      dash(105);
+      heal(600);
+      player.speedBoostTimer = 120;
+    }
+  };
+
+  window.useGadget = function () {
+    if (!player || !isPlaying || player.gadgets <= 0) return;
+
+    const gadget = gadgets[player.key];
+    if (!gadget) return;
+
+    player.gadgets--;
+    gadget();
+
+    playSound(720, 'triangle', .2, .12);
+    updateBattleHUD();
+  };
+})();
+</script>
 </body>
 </html>
