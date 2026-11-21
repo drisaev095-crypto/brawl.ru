@@ -398,6 +398,8 @@ function updateLobbyUI() {
   updateTopBar();
   const key = state.selected;
   const b = BRAWLERS[key];
+  if (!b) return;
+
   const r = RARITY_INFO[b.rarity];
   const stats = getBrawlerStats(key);
 
@@ -1789,6 +1791,12 @@ gameLoop();
   };
 
   Object.assign(BRAWLERS, NEW_BRAWLERS);
+  if (!BRAWLERS[state.selected]) {
+  state.selected = 'shelly';
+  saveState();
+  }
+
+  updateLobbyUI();
 
   // Обновляем надписи в интерфейсе с 25 на 45
   const btnBrawlers = document.querySelector("button[onclick=\"switchScreen('brawlers-screen')\"]");
