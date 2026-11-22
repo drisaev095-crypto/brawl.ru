@@ -3020,6 +3020,14 @@ function saveMegaRoadClaims(claims) {
     updateBattleHUD();
   };
 })();
+function watchAdForCoins() {
+  showRewardedCoins(100, (amount) => {
+    state.coins += amount;
+    if (typeof saveState === 'function') saveState();
+    if (typeof updateUI === 'function') updateUI();
+    alert('Вы получили ' + amount + ' монет!');
+  });
+}
 </script>
 </body>
 </html>
