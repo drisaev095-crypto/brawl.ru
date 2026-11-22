@@ -548,6 +548,15 @@ function renderDailyOffers() {
   const unlockedKeys = Object.keys(state.unlocked);
   const randKey = unlockedKeys[Math.floor(Math.random() * unlockedKeys.length)];
   const b = BRAWLERS[randKey];
+ 
+function watchAdForCoins() {
+  showRewardedCoins(100, (amount) => {
+    state.coins += amount;
+    if (typeof saveState === 'function') saveState();
+    if (typeof updateUI === 'function') updateUI();
+    alert('Вы получили ' + amount + ' монет!');
+  });
+}
 
   container.innerHTML = `
     <div class="shop-item">
@@ -558,6 +567,11 @@ function renderDailyOffers() {
       <div><b>МЕШОК МОНЕТ</b><div class="shop-icon">💰</div><small>+300 Монет сразу</small></div>
       <button class="bs-btn btn-purple" style="font-size:14px; padding:10px; margin-top:10px;" onclick="buyCoins(300, 15)">15 💎</button>
     </div>
+    <div class="shop-item">
+      <div><b>БЕСПЛАТНЫЕ МОНЕТЫ</b><div class="shop-icon">🎬</div><small>+100 Монет за рекламу</small></div>
+      <button class="bs-btn btn-green" style="font-size:14px; padding:10px; margin-top:10px;" onclick="watchAdForCoins()">СМОТРЕТЬ</button>
+    </div>
+
     <div class="shop-item">
       <div><b>СЛУЧАЙНЫЙ БОЕЦ</b><div class="shop-icon">🎁</div><small>Гарантированный новый боец!</small></div>
       <button class="bs-btn btn-red" style="font-size:14px; padding:10px; margin-top:10px;" onclick="buyRandomBrawler(80)">80 💎</button>
