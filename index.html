@@ -273,6 +273,60 @@
     </div>
     <canvas id="gameCanvas" width="960" height="540"></canvas>
   </div>
+<!-- Подключение библиотеки Яндекс Игр -->
+<script src="/sdk.js"></script>
+<script>
+  window.ysdk = null;
+
+  // Инициализация SDK при запуске
+  if (typeof YaGames !== 'undefined') {
+    YaGames.init().then(ysdk => {
+      window.ysdk = ysdk;
+      // Сообщаем платформе, что игра загрузилась
+      ysdk.features.LoadingAPI?.ready();
+      console.log('Яндекс SDK готов');
+    }).catch(err => {
+      console.error('Ошибка инициализации SDK:', err);
+    });
+  }
+
+  // Функция для показа рекламы за вознаграждение (монеты в магазине)
+  function showRewardedCoins(rewardAmount, onSuccessCallback) {
+    if (!window.ysdk) {
+      // Если тестируете локально или на GitHub Pages без Яндекса — сразу выдаем награду
+      console.log('Локальный тест: выдаем ' + rewardAmount + ' монет');
+      if (typeof onSuccessCallback === 'function') onSuccessCallback(rewardAmount);
+      return;
+    }
+
+    window.ysdk.adv.showRewardedVideo({
+      callbacks: {
+        onOpen: () => {
+          // Здесь можно поставить игру/звук на паузу
+        },
+        onRewarded: () => {
+          // Пользователь досмотрел ролик — начисляем награду
+          if (typeof onSuccessCallback === 'function') {
+            onSuccessCallback(rewardAmount);
+          }
+        },
+        onClose: () => {
+          // Здесь можно вернуть звук
+        },
+        onError: (e) => {
+          console.error('Ошибка показа рекламы:', e);
+        }
+      }
+    });
+  }
+
+  // Функция для обычной полноэкранной рекламы (например, после окончания боя)
+  function showFullscreenAd() {
+    if (window.ysdk) {
+      window.ysdk.adv.showFullscreenAdv();
+    }
+  }
+</script>
 
 <script>
 // --- ЗВУКОВОЙ ДВИЖОК (Web Audio API) ---
