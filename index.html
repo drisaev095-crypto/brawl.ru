@@ -3304,27 +3304,36 @@ function activateHypercharge() {
   }
 
   const ang = Math.atan2(mouseY - player.y, mouseX - player.x);
-  const d = Math.round(player.dmg * 1.35);
+  const d = Math.max(100, Math.round((player.dmg || 400) * 1.35));
 
   switch (hc.type) {
+    case 'ricochet_storm':
+      // 14 рикошетящих фиолетовых шаров веером
+      for (let i = 0; i < 14; i++) {
+        const spreadAng = ang + (i - 6.5) * 0.09;
+        spawnBullet(player.x, player.y, spreadAng, 12.5, 7, 620, '#e056fd', Math.round(d * 0.75), { bounces: 4 });
+      }
+      break;
+
     case 'nova_shot':
+    case 'torpedo_ring':
+    case 'crab_torrent':
       for (let i = 0; i < 16; i++) {
         spawnBullet(player.x, player.y, (Math.PI * 2 / 16) * i, 10.5, 7, 360, '#e056fd', d, { pierce: true });
       }
       break;
 
     case 'mega_burst':
-    case 'ricochet_storm':
-      for (let i = 0; i < 14; i++) {
-        setTimeout(() => {
-          if (isPlaying) spawnBullet(player.x, player.y, ang + (Math.random() - 0.5) * 0.12, 13.5, 6, 520, '#e056fd', d, { bounces: 3 });
-        }, i * 45);
+    case 'sniper_barrage':
+      for (let i = -3; i <= 3; i++) {
+        spawnBullet(player.x, player.y, ang + i * 0.08, 14, 7, 560, '#e056fd', d, { pierce: true });
       }
       break;
 
     case 'meteor_jump':
     case 'vampire_leap':
     case 'buoy_slam':
+    case 'monkey_slam':
       player.x = Math.max(30, Math.min(canvas.width - 30, mouseX));
       player.y = Math.max(30, Math.min(canvas.height - 30, mouseY));
       player.hp = Math.min(player.maxHp, player.hp + 1500);
@@ -3334,16 +3343,40 @@ function activateHypercharge() {
       break;
 
     case 'mega_bear':
-    case 'super_turret':
-      for (let i = 0; i < 3; i++) {
-        allies.push({ x: player.x + (i - 1) * 35, y: player.y + 25, type: i === 0 ? 'bear' : 'turret', hp: 3500, life: 600, cd: 0 });
-      }
+      // Только Нита призывает гигантского медведя!
+      allies.push({
+        x: player.x + Math.cos(ang) * 40,
+        y: player.y + Math.sin(ang) * 40,
+        type: 'bear',
+        hp: 6500, maxHp: 6500,
+        dmg: d,
+        life: 700, cd: 0
+      });
       player.hp = Math.min(player.maxHp, player.hp + 1500);
+      break;
+
+    case 'super_turret':
+    case 'robot_army':
+    case 'porter_squad':
+    case 'summon_lawrie':
+    case 'ego_clones':
+      for (let i = 0; i < 2; i++) {
+        allies.push({
+          x: player.x + (i === 0 ? -30 : 30),
+          y: player.y + 20,
+          type: 'turret',
+          hp: 3500, maxHp: 3500,
+          dmg: Math.round(d * 0.65),
+          life: 600, cd: 0
+        });
+      }
       break;
 
     case 'bull_charge':
     case 'barrel_roll':
     case 'nitro_dash':
+    case 'spirit_dash':
+    case 'ghost_train':
       player.x = Math.max(30, Math.min(canvas.width - 30, player.x + Math.cos(ang) * 180));
       player.y = Math.max(30, Math.min(canvas.height - 30, player.y + Math.sin(ang) * 180));
       player.speedBoostTimer = 360;
@@ -3357,6 +3390,8 @@ function activateHypercharge() {
     case 'cluster_boom':
     case 'minefield':
     case 'cannon_barrage':
+    case 'sound_bombs':
+    case 'orbital_drop':
       for (let i = 0; i < 8; i++) {
         const a = ang + (i - 3.5) * 0.16;
         spawnBullet(player.x, player.y, a, 10, 11, 460, '#e056fd', d, {
@@ -3379,6 +3414,9 @@ function activateHypercharge() {
     case 'toxic_aura':
     case 'stun_nova':
     case 'blizzard_push':
+    case 'shock_pulse':
+    case 'cinema_shield':
+    case 'radar_shock':
       for (let i = 0; i < 18; i++) {
         spawnBullet(player.x, player.y, (Math.PI * 2 / 18) * i, 9.5, 11, 250, '#e056fd', d, { stun: 60, knockback: 20 });
       }
@@ -3386,6 +3424,7 @@ function activateHypercharge() {
 
     case 'black_hole':
     case 'triple_grab':
+    case 'knuckle_pull':
       zones.push({ x: mouseX, y: mouseY, r: 120, dmg: Math.round(d * 0.35), color: 'rgba(142,68,173,0.45)', life: 180 });
       for (let i = -1; i <= 1; i++) {
         spawnBullet(player.x, player.y, ang + i * 0.18, 12, 10, 460, '#e056fd', d, { pull: true });
@@ -3408,6 +3447,7 @@ function activateHypercharge() {
 
   updateHyperHUD();
 }
+
 
 window.addEventListener('keydown', e => {
   if (e.code === 'KeyH' && typeof isPlaying !== 'undefined' && isPlaying) {
