@@ -3029,25 +3029,16 @@ function watchAdForCoins() {
   });
 }
 </script>
- <script>
+<script>
 // =========================================================
-// ЧАСТЬ 1: КУБКИ НА КАЖДОГО БОЙЦА, РАНГИ (ДЕРЕВО -> ПРАЙМЫ) И СЛОЖНОСТЬ БОТОВ
+// ТОЛЬКО РАНГИ: ДЕРЕВО -> БРОНЗА -> СЕРЕБРО -> ЗОЛОТО -> ПРАЙМЫ 1/2/3+
 // =========================================================
 
-let botDifficulty = 'pro'; // 'noob' | 'pro' | 'esports'
-const BOT_DIFF_CFG = {
-  noob:    { label: '🟢 СЛОЖНОСТЬ: НОВИЧОК',    hpMult: 0.55, dmgMult: 0.45, spdMult: 0.65, cdAdd: 35, dodge: 0.3, trophiesWin: 6,  coinsWin: 18 },
-  pro:     { label: '🟡 СЛОЖНОСТЬ: ПРОФИ',      hpMult: 0.78, dmgMult: 0.68, spdMult: 0.82, cdAdd: 10, dodge: 1.2, trophiesWin: 10, coinsWin: 30 },
-  esports: { label: '🔴 СЛОЖНОСТЬ: КИБЕРСПОРТ', hpMult: 1.05, dmgMult: 0.92, spdMult: 0.98, cdAdd: -12, dodge: 2.1, trophiesWin: 16, coinsWin: 50 }
-};
-
-// Инициализируем индивидуальные кубки для каждого бойца и считаем общие
 function syncBrawlerTrophies() {
-  if (!state.unlocked) return;
+  if (!state || !state.unlocked) return;
   const keys = Object.keys(state.unlocked);
   const hasAny = keys.some(k => typeof state.unlocked[k].trophies === 'number');
 
-  // Если переходим со старого сохранения — переносим текущие кубки на выбранного бойца
   if (!hasAny && state.trophies > 0 && state.unlocked[state.selected]) {
     state.unlocked[state.selected].trophies = state.trophies;
   }
@@ -3065,7 +3056,6 @@ function getBrawlerTrophies(key) {
   return (state.unlocked[key] && state.unlocked[key].trophies) || 0;
 }
 
-// Система рангов: Дерево (0-249), Бронза (250-499), Серебро (500-749), Золото (750-999), Прайм 1 (1000+), Прайм 2 (1500+), Прайм 3+ (2000+)
 function getRankInfo(trophies) {
   if (trophies < 250)  return { title: '🪵 ДЕРЕВО',  bg: '#5d4037', border: '#8d6e63', color: '#d7ccc8', glow: 'none' };
   if (trophies < 500)  return { title: '🥉 БРОНЗА',  bg: '#6e3b1e', border: '#cd7f32', color: '#f5cba7', glow: 'none' };
@@ -3078,8 +3068,8 @@ function getRankInfo(trophies) {
   return { title: `🟡 ПРАЙМ ${primeLvl}`, bg: '#785a00', border: '#ffd32a', color: '#fff200', glow: '0 0 16px #ffd32a' };
 }
 
-// Добавляем плашку ранга выбранного бойца в лобби и кнопку сложности ботов
-(function setupLobbyRankAndDiff() {
+// Плашка ранга выбранного бойца в лобби
+(function initLobbyRankBox() {
   const lobbyCenter = document.querySelector('.lobby-center');
   if (lobbyCenter && !document.getElementById('lobby-brawler-rank')) {
     const rankBox = document.createElement('div');
@@ -3088,25 +3078,8 @@ function getRankInfo(trophies) {
     const nameEl = document.getElementById('lobby-name');
     if (nameEl) lobbyCenter.insertBefore(rankBox, nameEl);
   }
-
-  const modeBtn = document.getElementById('mode-btn');
-  if (modeBtn && !document.getElementById('diff-btn')) {
-    const diffBtn = document.createElement('button');
-    diffBtn.id = 'diff-btn';
-    diffBtn.className = 'bs-btn btn-blue';
-    diffBtn.style.cssText = 'font-size:13px; padding:8px 16px; display:none;';
-    diffBtn.innerText = BOT_DIFF_CFG[botDifficulty].label;
-    diffBtn.onclick = function() {
-      const order = ['noob', 'pro', 'esports'];
-      botDifficulty = order[(order.indexOf(botDifficulty) + 1) % order.length];
-      diffBtn.innerText = BOT_DIFF_CFG[botDifficulty].label;
-      playSound(560, 'triangle', 0.1);
-    };
-    modeBtn.parentNode.insertBefore(diffBtn, modeBtn.nextSibling);
-  }
 })();
 
-// Обновление лобби, карточек бойцов и шапки с учётом кубков каждого бойца
 const _origUpdateTopBar = updateTopBar;
 updateTopBar = function() {
   syncBrawlerTrophies();
@@ -3129,6 +3102,7 @@ updateLobbyUI = function() {
   }
 };
 
+// Отображение ранга на карточке каждого из твоих 45 бойцов
 const _origRenderBrawlersGrid = renderBrawlersGrid;
 renderBrawlersGrid = function() {
   syncBrawlerTrophies();
@@ -3143,134 +3117,16 @@ renderBrawlersGrid = function() {
     const badge = document.createElement('div');
     badge.style.cssText = `font-size:11px; padding:3px 8px; border-radius:8px; border:2px solid ${r.border}; background:${r.bg}; color:${r.color}; margin-bottom:5px; text-shadow:1px 1px 0 #000;`;
     badge.innerText = `${r.title} (${bt} 🏆)`;
-    card.insertBefore(badge, card.children[2]);
+    card.insertBefore(badge, card.children);
   });
 };
 
-cycleGameMode = function() {
-  const modes = [
-    { id: 'showdown',  text: '💀 РЕЖИМ: СТОЛКНОВЕНИЕ' },
-    { id: 'gemgrab',   text: '💎 РЕЖИМ: ЗАХВАТ КРИСТАЛЛОВ' },
-    { id: 'heist',     text: '🧰 РЕЖИМ: ОГРАБЛЕНИЕ (СЕЙФ)' },
-    { id: 'smartbots', text: '🧠 РЕЖИМ: УМНЫЕ БОЙЦЫ (БОТЫ)' }
-  ];
-  const nextIdx = (modes.findIndex(m => m.id === gameMode) + 1) % modes.length;
-  gameMode = modes[nextIdx].id;
-  document.getElementById('mode-btn').innerText = modes[nextIdx].text;
-  const diffBtn = document.getElementById('diff-btn');
-  if (diffBtn) diffBtn.style.display = gameMode === 'smartbots' ? 'block' : 'none';
-  playSound(500, 'triangle', 0.1);
-};
-// =========================================================
-// ЧАСТЬ 2: АТАКИ УМНЫХ БОТОВ-БОЙЦОВ И НАГРАДЫ НА БОЙЦА
-// =========================================================
-
-let enemyBullets = [];
-
-function spawnEnemyBullet(x, y, ang, spd, rad, range, color, dmg, opts = {}) {
-  enemyBullets.push({
-    x, y, sx: x, sy: y,
-    dx: Math.cos(ang) * spd, dy: Math.sin(ang) * spd,
-    radius: rad, range, color, dmg,
-    poison: opts.poison || 0
-  });
-}
-
-function fireSmartBotAttack(bot, ang, isSuper = false) {
-  const b = BRAWLERS[bot.brawlerKey];
-  const d = Math.round(bot.dmg * (isSuper ? 1.45 : 1));
-  const col = isSuper ? '#f1c40f' : '#ff4757';
-
-  if (b.atk === 'spread' || b.atk === 'heavy_sg' || b.atk === 'double_sg') {
-    const count = isSuper ? 4 : 2;
-    for (let i = -count; i <= count; i++) {
-      spawnEnemyBullet(bot.x, bot.y, ang + i * 0.14, 8.8, 6, 255, col, Math.round(d * 0.45));
-    }
-  } else if (b.atk === 'melee' || b.atk === 'shovel' || b.atk === 'scarf') {
-    for (let i = -1; i <= 1; i++) {
-      spawnEnemyBullet(bot.x, bot.y, ang + i * 0.25, 8.5, 14, 120, col, Math.round(d * 0.72));
-    }
-    if (isSuper) {
-      bot.x = Math.max(30, Math.min(canvas.width - 30, bot.x + Math.cos(ang) * 130));
-      bot.y = Math.max(30, Math.min(canvas.height - 30, bot.y + Math.sin(ang) * 130));
-    }
-  } else if (b.atk === 'burst6' || b.atk === 'shuriken') {
-    const shots = isSuper ? 6 : 3;
-    for (let i = 0; i < shots; i++) {
-      setTimeout(() => {
-        if (isPlaying && bot.hp > 0) {
-          spawnEnemyBullet(bot.x, bot.y, ang + (Math.random() - 0.5) * 0.07, 12, 5, 460, col, Math.round(d * 0.42));
-        }
-      }, i * 65);
-    }
-  } else if (b.atk === 'cactus' || b.atk === 'cards_split') {
-    const count = isSuper ? 8 : 5;
-    for (let i = 0; i < count; i++) {
-      spawnEnemyBullet(bot.x, bot.y, ang + (Math.PI * 2 / count) * i, 8.5, 6, 290, col, Math.round(d * 0.5));
-    }
-  } else if (b.atk === 'daggers') {
-    for (let i = -1; i <= 1; i++) {
-      spawnEnemyBullet(bot.x, bot.y, ang + i * 0.14, 11, 6, 380, '#2ecc71', Math.round(d * 0.55), { poison: 3 });
-    }
-  } else {
-    spawnEnemyBullet(bot.x, bot.y, ang, isSuper ? 12.5 : 9.8, isSuper ? 12 : 8, 450, col, d);
-  }
-}
-
-function createSmartBrawlerBot(ex, ey) {
-  const keysList = Object.keys(BRAWLERS);
-  const pickKey = keysList[Math.floor(Math.random() * keysList.length)];
-  const b = BRAWLERS[pickKey];
-  const cfg = BOT_DIFF_CFG[botDifficulty];
-
-  const isMelee = ['melee', 'shovel', 'scarf', 'heavy_sg', 'double_sg', 'spread'].includes(b.atk);
-  const scale = 1 + Math.min(0.6, kills * 0.05);
-  const maxHp = Math.round(b.hp * cfg.hpMult * scale);
-
-  return {
-    x: ex, y: ey,
-    radius: 19,
-    hp: maxHp, maxHp: maxHp,
-    speed: Math.min(4.7, b.speed * cfg.spdMult),
-    dmg: Math.round(b.dmg * cfg.dmgMult * scale),
-    color: RARITY_INFO[b.rarity].color,
-    icon: b.icon,
-    name: b.name,
-    brawlerKey: pickKey,
-    isSmartBot: true,
-    preferredRange: isMelee ? 90 : 275,
-    strafeDir: Math.random() < 0.5 ? 1 : -1,
-    strafeTimer: 45 + Math.floor(Math.random() * 55),
-    shootCd: 45 + cfg.cdAdd,
-    ultCharge: 0,
-    stun: 0, poisonTicks: 0
-  };
-}
-
-const _origStartMatch = startMatch;
-startMatch = function() {
-  enemyBullets = [];
-  _origStartMatch();
-};
-
-const _origUpdateBattleHUD = updateBattleHUD;
-updateBattleHUD = function() {
-  _origUpdateBattleHUD();
-  if (gameMode === 'smartbots') {
-    const modeEl = document.getElementById('hud-mode-info');
-    if (modeEl) modeEl.innerText = `🧠 Умных ботов: ${enemies.length}`;
-  }
-};
-
-// Начисляем кубки конкретно выбранному бойцу и показываем его новый ранг
+// Начисление кубков выбранному бойцу после матча
 endMatch = function(died) {
   isPlaying = false;
   resetInputs();
-  const isSmart = gameMode === 'smartbots';
-  const cfg = BOT_DIFF_CFG[botDifficulty];
-
-  const earnedCoins = isSmart ? (kills * cfg.coinsWin + (died ? 8 : 25)) : (kills * 12 + (died ? 5 : 15));
-  const earnedTrophies = isSmart ? (kills * cfg.trophiesWin + (died ? -4 : 8)) : (kills * 3 + (died ? -2 : 5));
+  const earnedCoins = kills * 12 + (died ? 5 : 15);
+  const earnedTrophies = kills * 2 + (died ? -2 : 4);
 
   state.coins += earnedCoins;
   const curKey = state.selected;
@@ -3282,187 +3138,22 @@ endMatch = function(died) {
 
   const bt = getBrawlerTrophies(curKey);
   const rankNow = getRankInfo(bt);
-  const bName = BRAWLERS[curKey].name;
 
   setTimeout(() => {
     alert(
       `${died ? '💀 ТЕБЯ ПОБЕДИЛИ!' : '🏁 МАТЧ ЗАВЕРШЕН!'}\n` +
-      `Боец: ${bName} (${bt} 🏆)\n` +
-      `Ранг бойца: ${rankNow.title}\n` +
       `Побеждено врагов: ${kills}\n` +
+      `Ранг бойца: ${rankNow.title} (${bt} 🏆)\n` +
       `Награда: +${earnedCoins} 💰 и ${earnedTrophies >= 0 ? '+' : ''}${earnedTrophies} 🏆`
     );
     switchScreen('lobby-screen');
   }, 50);
 };
-// =========================================================
-// ЧАСТЬ 3: ИНТЕЛЛЕКТ БОТОВ (УВОРОТЫ, КАЙТИНГ, СУПЕР) И ОТРИСОВКА
-// =========================================================
 
-const _origUpdateBattle = updateBattle;
-updateBattle = function() {
-  if (!isPlaying || !player) return;
-
-  // Спавн умных ботов-бойцов в новом режиме
-  if (gameMode === 'smartbots') {
-    spawnTimer++;
-    if (spawnTimer >= 110 && enemies.length < 4) {
-      spawnTimer = 0;
-      const spawns = [
-        { x: 850, y: 100 }, { x: 850, y: 440 },
-        { x: 520, y: 70 },  { x: 520, y: 470 }
-      ];
-      const sp = spawns[Math.floor(Math.random() * spawns.length)];
-      enemies.push(createSmartBrawlerBot(sp.x, sp.y));
-    }
-  }
-
-  _origUpdateBattle();
-
-  const cfg = BOT_DIFF_CFG[botDifficulty];
-  const hidden = isPlayerHidden();
-
-  for (const e of enemies) {
-    if (!e.isSmartBot || e.stun > 0) continue;
-
-    // 1. Уклонение от пуль игрока (сила уворота зависит от выбранной сложности)
-    let dodgeX = 0, dodgeY = 0;
-    for (const b of bullets) {
-      const distToBullet = Math.hypot(b.x - e.x, b.y - e.y);
-      if (distToBullet < 135) {
-        const perp = Math.atan2(b.dy, b.dx) + (Math.PI / 2) * e.strafeDir;
-        dodgeX += Math.cos(perp) * cfg.dodge;
-        dodgeY += Math.sin(perp) * cfg.dodge;
-      }
-    }
-
-    // 2. Позиционирование, кайтинг и отступление при малом HP
-    const distToPlayer = Math.hypot(player.x - e.x, player.y - e.y);
-    const angToPlayer = Math.atan2(player.y - e.y, player.x - e.x);
-
-    e.strafeTimer--;
-    if (e.strafeTimer <= 0) {
-      e.strafeDir *= -1;
-      e.strafeTimer = 40 + Math.floor(Math.random() * 50);
-    }
-
-    let moveX = dodgeX, moveY = dodgeY;
-    if (!hidden || distToPlayer < 130) {
-      const lowHp = e.hp < e.maxHp * 0.32;
-      if (lowHp || distToPlayer < e.preferredRange - 35) {
-        moveX -= Math.cos(angToPlayer) * 0.95;
-        moveY -= Math.sin(angToPlayer) * 0.95;
-      } else if (distToPlayer > e.preferredRange + 45) {
-        moveX += Math.cos(angToPlayer) * 0.58;
-        moveY += Math.sin(angToPlayer) * 0.58;
-      }
-
-      const strafeAng = angToPlayer + (Math.PI / 2) * e.strafeDir;
-      moveX += Math.cos(strafeAng) * 0.65;
-      moveY += Math.sin(strafeAng) * 0.65;
-
-      // Стрельба и ульта
-      if (e.shootCd > 0) e.shootCd--;
-      if (e.shootCd <= 0 && distToPlayer < 465) {
-        const spread = botDifficulty === 'esports' ? 0.05 : botDifficulty === 'pro' ? 0.13 : 0.24;
-        const leadAng = angToPlayer + (Math.random() - 0.5) * spread;
-        if (e.ultCharge >= 100) {
-          e.ultCharge = 0;
-          addFloatingText(e.x, e.y - 34, '⚡ СУПЕР!', '#f1c40f');
-          fireSmartBotAttack(e, leadAng, true);
-          e.shootCd = Math.max(30, 62 + cfg.cdAdd);
-        } else {
-          fireSmartBotAttack(e, leadAng, false);
-          e.ultCharge = Math.min(100, e.ultCharge + 34);
-          e.shootCd = Math.max(25, 52 + cfg.cdAdd + Math.floor(Math.random() * 20));
-        }
-      }
-    }
-
-    const mLen = Math.hypot(moveX, moveY);
-    if (mLen > 0.1) {
-      const nx = Math.max(e.radius, Math.min(canvas.width - e.radius, e.x + (moveX / mLen) * (e.speed * 0.85)));
-      const ny = Math.max(e.radius, Math.min(canvas.height - e.radius, e.y + (moveY / mLen) * (e.speed * 0.85)));
-      const hitWall = walls.some(w => nx + e.radius > w.x && nx - e.radius < w.x + w.w && ny + e.radius > w.y && ny - e.radius < w.y + w.h);
-      if (!hitWall) {
-        e.x = nx;
-        e.y = ny;
-      } else {
-        e.strafeDir *= -1;
-      }
-    }
-  }
-
-  // Полёт и попадания пуль умных ботов
-  for (let i = enemyBullets.length - 1; i >= 0; i--) {
-    const eb = enemyBullets[i];
-    eb.x += eb.dx;
-    eb.y += eb.dy;
-
-    const hitWall = walls.some(w => eb.x + eb.radius > w.x && eb.x - eb.radius < w.x + w.w && eb.y + eb.radius > w.y && eb.y - eb.radius < w.y + w.h);
-    if (hitWall || eb.x < 0 || eb.x > canvas.width || eb.y < 0 || eb.y > canvas.height || Math.hypot(eb.x - eb.sx, eb.y - eb.sy) >= eb.range) {
-      enemyBullets.splice(i, 1);
-      continue;
-    }
-
-    if (Math.hypot(eb.x - player.x, eb.y - player.y) < eb.radius + player.radius) {
-      const dmgTaken = Math.round(eb.dmg * (player.shieldTimer > 0 ? 0.4 : 1));
-      player.hp -= dmgTaken;
-      addFloatingText(player.x, player.y - 24, `-${dmgTaken}`, '#ff4757');
-      updateBattleHUD();
-      enemyBullets.splice(i, 1);
-      if (player.hp <= 0) {
-        endMatch(true);
-        return;
-      }
-    }
-  }
-};
-
-// Отрисовка иконок умных ботов, имён, кольца ульты и их пуль
-const _origDrawBattle = drawBattle;
-drawBattle = function() {
-  _origDrawBattle();
-  if (!isPlaying) return;
-
-  for (const e of enemies) {
-    if (!e.isSmartBot) continue;
-
-    ctx.font = '20px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(e.icon, e.x, e.y);
-
-    ctx.font = 'bold 11px Arial Black';
-    ctx.fillStyle = '#000';
-    ctx.fillText(e.name, e.x + 1, e.y - e.radius - 19);
-    ctx.fillStyle = e.ultCharge >= 100 ? '#f1c40f' : '#fff';
-    ctx.fillText(e.name, e.x, e.y - e.radius - 20);
-
-    if (e.ultCharge >= 100) {
-      ctx.beginPath();
-      ctx.arc(e.x, e.y, e.radius + 4, 0, Math.PI * 2);
-      ctx.strokeStyle = '#f1c40f';
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
-    }
-  }
-
-  for (const eb of enemyBullets) {
-    ctx.beginPath();
-    ctx.arc(eb.x, eb.y, eb.radius, 0, Math.PI * 2);
-    ctx.fillStyle = eb.color;
-    ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#000';
-    ctx.stroke();
-  }
-};
-
-// Обновляем интерфейс при запуске
 syncBrawlerTrophies();
 updateLobbyUI();
 </script>
+
 
 </body>
 </html>
