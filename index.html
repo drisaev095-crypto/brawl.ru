@@ -3031,7 +3031,7 @@ function watchAdForCoins() {
 </script>
 <script>
 // =========================================================
-// ИСПРАВЛЕННЫЙ СКРИПТ РАНГОВ (ВСЕ 45 БОЙЦОВ ВИДНЫ)
+// РАНГИ (ДЕРЕВО -> ПРАЙМЫ 1/2/3+) ДЛЯ ВСЕХ 45 БОЙЦОВ
 // =========================================================
 
 function syncBrawlerTrophies() {
@@ -3069,89 +3069,88 @@ function getRankInfo(trophies) {
 }
 
 // Плашка ранга выбранного бойца в лобби
-(function initLobbyRankBox() {
+function refreshLobbyRankBadge() {
   const lobbyCenter = document.querySelector('.lobby-center');
-  if (lobbyCenter && !document.getElementById('lobby-brawler-rank')) {
-    const rankBox = document.createElement('div');
+  if (!lobbyCenter) return;
+
+  let rankBox = document.getElementById('lobby-brawler-rank');
+  if (!rankBox) {
+    rankBox = document.createElement('div');
     rankBox.id = 'lobby-brawler-rank';
     rankBox.style.cssText = 'padding:6px 16px; border-radius:12px; font-size:15px; border:3px solid #000; margin-bottom:10px; text-shadow:1px 1px 0 #000;';
     const nameEl = document.getElementById('lobby-name');
     if (nameEl) lobbyCenter.insertBefore(rankBox, nameEl);
   }
-})();
 
-const _origUpdateTopBar = updateTopBar;
-updateTopBar = function() {
-  syncBrawlerTrophies();
-  _origUpdateTopBar();
-};
-
-const _origUpdateLobbyUI = updateLobbyUI;
-updateLobbyUI = function() {
-  syncBrawlerTrophies();
-  _origUpdateLobbyUI();
-  const rankEl = document.getElementById('lobby-brawler-rank');
-  if (rankEl) {
+  if (typeof state !== 'undefined' && state.selected) {
     const bt = getBrawlerTrophies(state.selected);
     const r = getRankInfo(bt);
-    rankEl.innerText = `${r.title} • ${bt} 🏆`;
-    rankEl.style.background = r.bg;
-    rankEl.style.borderColor = r.border;
-    rankEl.style.color = r.color;
-    rankEl.style.boxShadow = r.glow;
+    rankBox.innerText = `${r.title} • ${bt} 🏆`;
+    rankBox.style.background = r.bg;
+    rankBox.style.borderColor = r.border;
+    rankBox.style.color = r.color;
+    rankBox.style.boxShadow = r.glow;
   }
-};
+}
 
-// Отображение ранга на каждой карточке из всех 45 бойцов
-const _origRenderBrawlersGrid = renderBrawlersGrid;
-renderBrawlersGrid = function() {
+// Автоматически добавляем плашку ранга на КАЖДУЮ карточку в сетке бойцов (все 45)
+function decorateAllBrawlerCards() {
+  if (typeof BRAWLERS === 'undefined' || typeof state === 'undefined') return;
   syncBrawlerTrophies();
-  _origRenderBrawlersGrid();
+
   const cards = document.querySelectorAll('#brawlers-grid .b-card');
   const keys = Object.keys(BRAWLERS);
+
   cards.forEach((card, idx) => {
+    if (card.querySelector('.rank-pill-badge')) return;
     const k = keys[idx];
     if (!k || !state.unlocked[k]) return;
+
     const bt = getBrawlerTrophies(k);
     const r = getRankInfo(bt);
     const badge = document.createElement('div');
+    badge.className = 'rank-pill-badge';
     badge.style.cssText = `font-size:11px; padding:3px 8px; border-radius:8px; border:2px solid ${r.border}; background:${r.bg}; color:${r.color}; margin-bottom:5px; text-shadow:1px 1px 0 #000;`;
     badge.innerText = `${r.title} (${bt} 🏆)`;
     card.insertBefore(badge, card.firstChild);
   });
-};
+}
 
-// Начисление кубков выбранному бойцу после матча
-endMatch = function(died) {
-  isPlaying = false;
-  resetInputs();
-  const earnedCoins = kills * 12 + (died ? 5 : 15);
-  const earnedTrophies = kills * 2 + (died ? -2 : 4);
-
-  state.coins += earnedCoins;
-  const curKey = state.selected;
-  if (state.unlocked[curKey]) {
-    state.unlocked[curKey].trophies = Math.max(0, (state.unlocked[curKey].trophies || 0) + earnedTrophies);
-  }
+// Следим за изменениями сетки бойцов и лобби без вмешательства в чужой код
+window.addEventListener('load', () => {
   syncBrawlerTrophies();
-  saveState();
+  refreshLobbyRankBadge();
+  decorateAllBrawlerCards();
 
-  const bt = getBrawlerTrophies(curKey);
-  const rankNow = getRankInfo(bt);
+  const grid = document.getElementById('brawlers-grid');
+  if (grid) {
+    new MutationObserver(() => decorateAllBrawlerCards()).observe(grid, { childList: true });
+  }
 
+  const lobbyName = document.getElementById('lobby-name');
+  if (lobbyName) {
+    new MutationObserver(() => refreshLobbyRankBadge()).observe(lobbyName, { childList: true, characterData: true, subtree: true });
+  }
+});
+
+// Начисление кубков выбранному бойцу после боя
+const _prevEndMatch = typeof endMatch === 'function' ? endMatch : null;
+endMatch = function(died) {
+  if (_prevEndMatch) _prevEndMatch(died);
   setTimeout(() => {
-    alert(
-      `${died ? '💀 ТЕБЯ ПОБЕДИЛИ!' : '🏁 МАТЧ ЗАВЕРШЕН!'}\n` +
-      `Побеждено врагов: ${kills}\n` +
-      `Ранг бойца: ${rankNow.title} (${bt} 🏆)\n` +
-      `Награда: +${earnedCoins} 💰 и ${earnedTrophies >= 0 ? '+' : ''}${earnedTrophies} 🏆`
-    );
-    switchScreen('lobby-screen');
-  }, 50);
+    if (typeof state === 'undefined') return;
+    const earnedTrophies = (typeof kills === 'number' ? kills * 2 : 0) + (died ? -2 : 4);
+    const curKey = state.selected;
+    if (state.unlocked[curKey]) {
+      // Компенсируем общее прибавление, чтобы кубки хранились в бойце
+      state.unlocked[curKey].trophies = Math.max(0, (state.unlocked[curKey].trophies || 0) + earnedTrophies);
+    }
+    syncBrawlerTrophies();
+    if (typeof saveState === 'function') saveState();
+    if (typeof updateTopBar === 'function') updateTopBar();
+    refreshLobbyRankBadge();
+  }, 60);
 };
-
-syncBrawlerTrophies();
-updateLobbyUI();
 </script>
 
 
