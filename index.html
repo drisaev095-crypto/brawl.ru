@@ -3061,12 +3061,13 @@ function getRankInfo(trophies) {
   if (trophies < 500)  return { title: '🥉 БРОНЗА',  bg: '#6e3b1e', border: '#cd7f32', color: '#f5cba7', glow: 'none' };
   if (trophies < 750)  return { title: '🥈 СЕРЕБРО', bg: '#4b5563', border: '#bdc3c7', color: '#ecf0f1', glow: 'none' };
   if (trophies < 1000) return { title: '🥇 ЗОЛОТО',  bg: '#7d6608', border: '#f1c40f', color: '#fcf3cf', glow: '0 0 8px rgba(241,196,15,0.4)' };
+  if (trophies < 1500) return { title: '🟣 ПРАЙМ 1', bg: '#4a148c', border: '#be2edd', color: '#f3e5f5', glow: '0 0 12px #be2edd' };
+  if (trophies < 2000) return { title: '🔴 ПРАЙМ 2', bg: '#7f1d1d', border: '#ff3f34', color: '#ffcccc', glow: '0 0 14px #ff3f34' };
 
-  const primeLvl = Math.floor((trophies - 1000) / 500) + 1;
-  if (primeLvl === 1)  return { title: '🟣 ПРАЙМ 1', bg: '#4a148c', border: '#be2edd', color: '#f3e5f5', glow: '0 0 12px #be2edd' };
-  if (primeLvl === 2)  return { title: '🔴 ПРАЙМ 2', bg: '#7f1d1d', border: '#ff3f34', color: '#ffcccc', glow: '0 0 14px #ff3f34' };
+  const primeLvl = Math.floor((trophies - 2000) / 1000) + 3;
   return { title: `🟡 ПРАЙМ ${primeLvl}`, bg: '#785a00', border: '#ffd32a', color: '#fff200', glow: '0 0 16px #ffd32a' };
 }
+
 
 // Плашка ранга выбранного бойца в лобби
 (function initLobbyRankBox() {
