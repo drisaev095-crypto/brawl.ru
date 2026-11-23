@@ -3483,6 +3483,282 @@ window.addEventListener('load', () => {
   }
 });
 </script>
+<script>
+// =========================================================
+// ГИПЕРЗАРЯДЫ В БОЮ — ЧЕСТНАЯ ЗАРЯДКА ТОЛЬКО ОТ ПОПАДАНИЙ (ЧАСТЬ 2 из 2)
+// =========================================================
+
+(function initHyperHUD() {
+  const hud = document.getElementById('battle-hud');
+  if (hud && !document.getElementById('hyper-hud-wrap')) {
+    const wrap = document.createElement('div');
+    wrap.id = 'hyper-hud-wrap';
+    wrap.style.cssText = 'display:flex; align-items:center; gap:6px;';
+    wrap.innerHTML = `
+      <span style="color:#e056fd;">ГИПЕР (H):</span>
+      <div class="hud-bar" style="border-color:#be2edd; width:80px;">
+        <div id="hyper-fill" style="height:100%; width:0%; background:linear-gradient(90deg,#8e44ad,#e056fd);"></div>
+      </div>
+      <button id="hyper-btn" class="mini-btn btn-purple" style="padding:4px 8px; display:none; border-color:#f1c40f;" onclick="activateHypercharge()">🟣 ГИПЕР!</button>
+    `;
+    const exitBtn = hud.querySelector('button');
+    if (exitBtn) hud.insertBefore(wrap, exitBtn);
+    else hud.appendChild(wrap);
+  }
+
+  const mobBtns = document.getElementById('mobile-action-buttons');
+  if (mobBtns && !document.getElementById('mobile-hyper')) {
+    const hBtn = document.createElement('button');
+    hBtn.id = 'mobile-hyper';
+    hBtn.className = 'mobile-action';
+    hBtn.type = 'button';
+    hBtn.innerText = 'ГИПЕР';
+    hBtn.style.cssText = 'background:#9b59b6; color:#fff;';
+    hBtn.addEventListener('touchstart', e => { e.preventDefault(); activateHypercharge(); });
+    hBtn.addEventListener('click', () => activateHypercharge());
+    mobBtns.appendChild(hBtn);
+  }
+})();
+
+function updateHyperHUD() {
+  const fill = document.getElementById('hyper-fill');
+  const btn = document.getElementById('hyper-btn');
+  if (!fill || !btn) return;
+
+  if (hyperActiveTimer > 0) {
+    fill.style.width = Math.round((hyperActiveTimer / 360) * 100) + '%';
+    fill.style.background = '#ff00ff';
+    btn.style.display = 'none';
+  } else {
+    fill.style.width = Math.min(100, hyperCharge) + '%';
+    fill.style.background = hyperCharge >= 100 ? '#e056fd' : '#8e44ad';
+    btn.style.display = hyperCharge >= 100 ? 'inline-block' : 'none';
+  }
+}
+
+function activateHypercharge() {
+  if (typeof player === 'undefined' || !player || !isPlaying) return;
+  if (hyperCharge < 100 || hyperActiveTimer > 0) return;
+
+  hyperCharge = 0;
+  hyperActiveTimer = 360; // 6 секунд ярости
+  player.ammo = 3;
+  player.shieldTimer = Math.max(player.shieldTimer || 0, 360);
+
+  const hc = getBrawlerHyper(player.key);
+  if (typeof playSound === 'function') playSound(980, 'sawtooth', 0.35, 0.16);
+  if (typeof addFloatingText === 'function') {
+    addFloatingText(player.x, player.y - 34, `🟣 ${hc.name}!`, '#e056fd');
+  }
+
+  const ang = Math.atan2(mouseY - player.y, mouseX - player.x);
+  const d = Math.round(player.dmg * 1.35);
+
+  switch (hc.type) {
+    case 'nova_shot':
+      for (let i = 0; i < 16; i++) {
+        spawnBullet(player.x, player.y, (Math.PI * 2 / 16) * i, 10.5, 7, 360, '#e056fd', d, { pierce: true });
+      }
+      break;
+
+    case 'mega_burst':
+    case 'ricochet_storm':
+      for (let i = 0; i < 14; i++) {
+        setTimeout(() => {
+          if (isPlaying) spawnBullet(player.x, player.y, ang + (Math.random() - 0.5) * 0.12, 13.5, 6, 520, '#e056fd', d, { bounces: 3 });
+        }, i * 45);
+      }
+      break;
+
+    case 'meteor_jump':
+    case 'vampire_leap':
+    case 'buoy_slam':
+      player.x = Math.max(30, Math.min(canvas.width - 30, mouseX));
+      player.y = Math.max(30, Math.min(canvas.height - 30, mouseY));
+      player.hp = Math.min(player.maxHp, player.hp + 1500);
+      for (let i = 0; i < 12; i++) {
+        spawnBullet(player.x, player.y, (Math.PI * 2 / 12) * i, 9, 10, 170, '#e056fd', d, { stun: 65, knockback: 18 });
+      }
+      break;
+
+    case 'mega_bear':
+    case 'super_turret':
+      for (let i = 0; i < 3; i++) {
+        allies.push({ x: player.x + (i - 1) * 35, y: player.y + 25, type: i === 0 ? 'bear' : 'turret', hp: 3500, life: 600, cd: 0 });
+      }
+      player.hp = Math.min(player.maxHp, player.hp + 1500);
+      break;
+
+    case 'bull_charge':
+    case 'barrel_roll':
+    case 'nitro_dash':
+      player.x = Math.max(30, Math.min(canvas.width - 30, player.x + Math.cos(ang) * 180));
+      player.y = Math.max(30, Math.min(canvas.height - 30, player.y + Math.sin(ang) * 180));
+      player.speedBoostTimer = 360;
+      for (let i = -3; i <= 3; i++) {
+        spawnBullet(player.x, player.y, ang + i * 0.22, 10, 9, 260, '#e056fd', d, { knockback: 22 });
+      }
+      break;
+
+    case 'rocket_rain':
+    case 'acid_storm':
+    case 'cluster_boom':
+    case 'minefield':
+    case 'cannon_barrage':
+      for (let i = 0; i < 8; i++) {
+        const a = ang + (i - 3.5) * 0.16;
+        spawnBullet(player.x, player.y, a, 10, 11, 460, '#e056fd', d, {
+          puddle: { r: 52, dmg: Math.round(d * 0.45), color: 'rgba(224,86,253,0.42)', life: 160 }
+        });
+      }
+      break;
+
+    case 'mega_heal':
+    case 'heal_station':
+      player.hp = Math.min(player.maxHp, player.hp + 3200);
+      addFloatingText(player.x, player.y - 50, '+3200 HP!', '#2ecc71');
+      for (let i = 0; i < 10; i++) {
+        spawnBullet(player.x, player.y, (Math.PI * 2 / 10) * i, 8.5, 9, 240, '#2ecc71', d);
+      }
+      break;
+
+    case 'thorn_aura':
+    case 'quake_pull':
+    case 'toxic_aura':
+    case 'stun_nova':
+    case 'blizzard_push':
+    case 'radar_shock':
+      for (let i = 0; i < 18; i++) {
+        spawnBullet(player.x, player.y, (Math.PI * 2 / 18) * i, 9.5, 11, 250, '#e056fd', d, { stun: 60, knockback: 20 });
+      }
+      break;
+
+    case 'black_hole':
+    case 'triple_grab':
+      zones.push({ x: mouseX, y: mouseY, r: 120, dmg: Math.round(d * 0.35), color: 'rgba(142,68,173,0.45)', life: 180 });
+      for (let i = -1; i <= 1; i++) {
+        spawnBullet(player.x, player.y, ang + i * 0.18, 12, 10, 460, '#e056fd', d, { pull: true });
+      }
+      break;
+
+    case 'shadow_clone':
+      player.invisTimer = 300;
+      for (let i = 0; i < 12; i++) {
+        spawnBullet(player.x, player.y, (Math.PI * 2 / 12) * i, 11, 7, 360, '#8e44ad', d, { poison: 4 });
+      }
+      break;
+
+    default:
+      for (let i = -3; i <= 3; i++) {
+        spawnBullet(player.x, player.y, ang + i * 0.12, 12, 9, 480, '#e056fd', d, { pierce: true });
+      }
+      break;
+  }
+
+  updateHyperHUD();
+}
+
+window.addEventListener('keydown', e => {
+  if (e.code === 'KeyH' && typeof isPlaying !== 'undefined' && isPlaying) {
+    activateHypercharge();
+  }
+});
+
+// Сброс при старте матча
+const _hcStartMatch = typeof startMatch === 'function' ? startMatch : null;
+if (_hcStartMatch) {
+  startMatch = function() {
+    hyperCharge = 0;
+    hyperActiveTimer = 0;
+    _hcStartMatch();
+    updateHyperHUD();
+  };
+}
+
+// Заряжаем Гиперзаряд ТОЛЬКО при реальных попаданиях пуль по врагам, ящикам или сейфу!
+const _hcUpdateBattle = typeof updateBattle === 'function' ? updateBattle : null;
+if (_hcUpdateBattle) {
+  updateBattle = function() {
+    // Проверяем попадания пуль до основного расчёта столкновений
+    if (isPlaying && player && hyperActiveTimer <= 0 && hyperCharge < 100) {
+      for (const b of bullets) {
+        if (b._hyperCounted) continue;
+
+        let hitTarget = false;
+        // Попадание по врагу
+        for (const e of enemies) {
+          if (Math.hypot(b.x - e.x, b.y - e.y) <= b.radius + e.radius + 4) {
+            hitTarget = true;
+            break;
+          }
+        }
+        // Попадание по ящику в Столкновении
+        if (!hitTarget && typeof crates !== 'undefined') {
+          for (const c of crates) {
+            if (Math.abs(b.x - c.x) <= 22 + b.radius && Math.abs(b.y - c.y) <= 22 + b.radius) {
+              hitTarget = true;
+              break;
+            }
+          }
+        }
+        // Попадание по сейфу в Ограблении
+        if (!hitTarget && typeof heistSafe !== 'undefined' && heistSafe) {
+          if (Math.hypot(b.x - heistSafe.x, b.y - heistSafe.y) <= heistSafe.radius + b.radius + 4) {
+            hitTarget = true;
+          }
+        }
+
+        if (hitTarget) {
+          b._hyperCounted = true;
+          // Зарядка: примерно 7–8 точных попаданий = 100% Гиперзаряда
+          hyperCharge = Math.min(100, hyperCharge + 14);
+          updateHyperHUD();
+        }
+      }
+    }
+
+    _hcUpdateBattle();
+
+    if (!isPlaying || !player) return;
+    if (hyperActiveTimer > 0) {
+      hyperActiveTimer--;
+      // Ускоренная перезарядка и лёгкий подхил во время активного Гиперзаряда
+      player.ammo = Math.min(3, player.ammo + 0.012);
+      if (hyperActiveTimer % 15 === 0) {
+        player.hp = Math.min(player.maxHp, player.hp + 45);
+      }
+      updateHyperHUD();
+    }
+  };
+}
+
+// Фиолетовая аура вокруг бойца во время действия Гиперзаряда
+const _hcDrawBattle = typeof drawBattle === 'function' ? drawBattle : null;
+if (_hcDrawBattle) {
+  drawBattle = function() {
+    _hcDrawBattle();
+    if (!isPlaying || !player || hyperActiveTimer <= 0) return;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.radius + 11 + Math.sin(Date.now() * 0.02) * 3, 0, Math.PI * 2);
+    ctx.strokeStyle = '#e056fd';
+    ctx.lineWidth = 4;
+    ctx.shadowColor = '#be2edd';
+    ctx.shadowBlur = 15;
+    ctx.stroke();
+    ctx.restore();
+  };
+}
+
+window.addEventListener('load', () => {
+  refreshLobbyHyperBox();
+  const lobbyName = document.getElementById('lobby-name');
+  if (lobbyName) {
+    new MutationObserver(() => refreshLobbyHyperBox()).observe(lobbyName, { childList: true, characterData: true, subtree: true });
+  }
+});
+</script>
 
 
 </body>
