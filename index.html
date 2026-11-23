@@ -3031,11 +3031,11 @@ function watchAdForCoins() {
 </script>
 <script>
 // =========================================================
-// ТОЛЬКО РАНГИ: ДЕРЕВО -> БРОНЗА -> СЕРЕБРО -> ЗОЛОТО -> ПРАЙМЫ 1/2/3+
+// ИСПРАВЛЕННЫЙ СКРИПТ РАНГОВ (ВСЕ 45 БОЙЦОВ ВИДНЫ)
 // =========================================================
 
 function syncBrawlerTrophies() {
-  if (!state || !state.unlocked) return;
+  if (typeof state === 'undefined' || !state.unlocked) return;
   const keys = Object.keys(state.unlocked);
   const hasAny = keys.some(k => typeof state.unlocked[k].trophies === 'number');
 
@@ -3067,7 +3067,6 @@ function getRankInfo(trophies) {
   const primeLvl = Math.floor((trophies - 2000) / 1000) + 3;
   return { title: `🟡 ПРАЙМ ${primeLvl}`, bg: '#785a00', border: '#ffd32a', color: '#fff200', glow: '0 0 16px #ffd32a' };
 }
-
 
 // Плашка ранга выбранного бойца в лобби
 (function initLobbyRankBox() {
@@ -3103,7 +3102,7 @@ updateLobbyUI = function() {
   }
 };
 
-// Отображение ранга на карточке каждого из твоих 45 бойцов
+// Отображение ранга на каждой карточке из всех 45 бойцов
 const _origRenderBrawlersGrid = renderBrawlersGrid;
 renderBrawlersGrid = function() {
   syncBrawlerTrophies();
@@ -3118,7 +3117,7 @@ renderBrawlersGrid = function() {
     const badge = document.createElement('div');
     badge.style.cssText = `font-size:11px; padding:3px 8px; border-radius:8px; border:2px solid ${r.border}; background:${r.bg}; color:${r.color}; margin-bottom:5px; text-shadow:1px 1px 0 #000;`;
     badge.innerText = `${r.title} (${bt} 🏆)`;
-    card.insertBefore(badge, card.children);
+    card.insertBefore(badge, card.firstChild);
   });
 };
 
